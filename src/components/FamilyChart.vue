@@ -1,4 +1,3 @@
-<!-- filepath: /Users/nkannaiyan/Code/ChatGPTApps/FamilyTree/family-tree-app/src/components/FamilyChart.vue -->
 <template>
   <div>
     <div
@@ -41,8 +40,13 @@ const styleConfig = [
     selector: "node",
     style: {
       "background-color": (ele) => {
-        if (ele.data("isCouple")) return "#DDA0DD"; // Pinkish blue for couples node background
-        return ele.data("gender") === "male" ? "#ADD8E6" : "#FFB6C1";
+        // Check if the node id starts with "family"
+        if (ele.data("id").startsWith("family")) {
+          return "#DDA0DD"; // Light purple for family nodes
+        } else {
+          // Default colors based on gender for other nodes
+          return ele.data("gender") === "male" ? "#ADD8E6" : "#FFB6C1";
+        }
       },
       label: (ele) => ele.data("label"),
       "text-valign": "center",
@@ -108,24 +112,6 @@ const initializeChart = () => {
       if (storeEdge) storeEdge.data.label = newLabel;
     }
   });
-
-  // Center the user node
-  /*  cy.value.on("layoutstop", () => {
-    const focusedNode = familyTreeStore.nodes.find(
-      (node) => node.data.id === familyTreeStore.user
-    );
-    if (focusedNode) {
-      const cyNode = cy.value.getElementById(focusedNode.data.id);
-      cy.value.animate({
-        center: {
-          eles: cyNode,
-        },
-        duration: 1000, // Smooth animation duration in ms
-        easing: "ease-in-out",
-      });
-    }
-  });
-  */
 };
 
 watch(
