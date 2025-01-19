@@ -1,6 +1,7 @@
 import { defineStore } from "pinia";
 import { initializeRootPerson } from "./actions/initializeRootPerson.js";
 import { addPerson } from "./actions/addPerson.js";
+import { importPersons } from "./actions/importPersons.js";
 
 export const useFamilyTreeStore = defineStore("familyTree", {
   state: () => ({
@@ -13,5 +14,6 @@ export const useFamilyTreeStore = defineStore("familyTree", {
   actions: {
     initializeRootPerson,
     addPerson,
+    importPersons,
   },
 });
