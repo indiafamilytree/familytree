@@ -27,6 +27,9 @@ export function addFamilyAndEdges(parent, child, relation, enableLogging) {
   } else if (relation === "Mother") {
     // Find family by childId
     family = this.families.find((f) => f.childrenIds.includes(child.id));
+  } else if (relation === "Husband") {
+    // Find family by childId
+    family = this.families.find((f) => f.childrenIds.includes(child.id));
   } else {
     // Original logic for other relations
     family = this.families.find((f) => f.childrenIds.includes(child.id));
@@ -37,18 +40,12 @@ export function addFamilyAndEdges(parent, child, relation, enableLogging) {
     const familyId = `family-${this.families.length + 1}`;
     family = {
       id: familyId,
-      fatherId:
-        relation === "Mother" ||
-        relation === "Wife" ||
-        (relation === "Son" && parent.gender === "female") ||
-        (relation === "Daughter" && parent.gender === "female")
-          ? null
-          : parent.id,
+      fatherId: relation === "Mother" || relation === "Wife" ? null : parent.id,
       motherId:
         relation === "Father" ||
         relation === "Husband" ||
-        (relation === "Son" && parent.gender === "male") ||
-        (relation === "Daughter" && parent.gender === "male")
+        relation === "Son" ||
+        relation === "Daughter"
           ? null
           : parent.id,
       childrenIds:
@@ -82,6 +79,7 @@ export function addFamilyAndEdges(parent, child, relation, enableLogging) {
     family.fatherId = parent.id;
   } else if (relation === "Husband") {
     family.fatherId = child.id;
+    family.motherId = parent.id;
   } else if (relation === "Son" || relation === "Daughter") {
     if (parent.gender === "male") {
       family.fatherId = parent.id;
@@ -104,7 +102,11 @@ export function addFamilyAndEdges(parent, child, relation, enableLogging) {
       ? this.persons.find((p) => p.id === family.motherId)?.name || "Unknown"
       : "";
 
-    if (fatherName !== "" && motherName !== "") {
+    if (relation === "Husband") {
+      const husbandName = child.name;
+      const wifeName = parent.name;
+      familyNode.data.label = `${husbandName}\n${wifeName}`;
+    } else if (fatherName !== "" && motherName !== "") {
       familyNode.data.label = `${fatherName}\n${motherName}`;
     } else if (fatherName !== "") {
       familyNode.data.label = `${fatherName}`;

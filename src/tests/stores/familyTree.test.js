@@ -670,4 +670,107 @@ describe("FamilyTree", function () {
       "Son edge from family to Muthamilan should exist"
     );
   });
+
+  it("should correctly add a husband to a daughter linked to a father", function () {
+    let logging = true;
+    // 1. Add a father (Natesan)
+    familyTreeStore.addPerson(
+      {
+        name: "Natesan",
+        gender: "male",
+        relation: "father",
+        linkedPersonId: "person-1", // Linked to Kannaiyan
+      },
+      logging
+    );
+
+    // 2. Add a daughter (Tamilselvi) to the father (Natesan)
+    familyTreeStore.addPerson(
+      {
+        name: "Tamilselvi",
+        gender: "female",
+        relation: "daughter",
+        linkedPersonId: "person-2", // Linked to Natesan
+      },
+      logging
+    );
+
+    // 3. Add a husband (Ramamoorthy) to the daughter (Tamilselvi)
+    familyTreeStore.addPerson(
+      {
+        name: "Ramamoorthy",
+        gender: "male",
+        relation: "husband",
+        linkedPersonId: "person-3", // Linked to Tamilselvi
+      },
+      logging
+    );
+
+    // Assertions:
+    const families = familyTreeStore.families;
+    assert.strictEqual(families.length, 2, "Two families should exist");
+
+    // Check Natesan's family
+    const natesanFamily = familyTreeStore.families.find(
+      (f) => f.fatherId === "person-2" && f.childrenIds.includes("person-3")
+    );
+    assert.ok(natesanFamily, "Natesan's family should exist");
+
+    // Check Tamilselvi's family
+    const tamilselviFamily = familyTreeStore.families.find(
+      (f) => f.fatherId === "person-4" && f.motherId === "person-3"
+    );
+    assert.ok(tamilselviFamily, "Tamilselvi's family should exist");
+
+    // Check for correct edges
+    const fatherEdge = familyTreeStore.edges.find(
+      (e) =>
+        e.data.source === "person-2" &&
+        e.data.target === natesanFamily.id &&
+        e.data.label === "Father"
+    );
+    assert.ok(fatherEdge, "Father edge from Natesan to family should exist");
+
+    const daughterEdge = familyTreeStore.edges.find(
+      (e) =>
+        e.data.source === natesanFamily.id &&
+        e.data.target === "person-3" &&
+        e.data.label === "Daughter"
+    );
+    assert.ok(
+      daughterEdge,
+      "Daughter edge from family to Tamilselvi should exist"
+    );
+
+    const husbandEdge = familyTreeStore.edges.find(
+      // Corrected assertion
+      (e) =>
+        e.data.source === "person-4" &&
+        e.data.target === tamilselviFamily.id &&
+        e.data.label === "Father"
+    );
+    assert.ok(
+      husbandEdge,
+      "Father edge from Ramamoorthy to family should exist"
+    );
+
+    // Check family node label
+    const natesanFamilyNode = familyTreeStore.nodes.find(
+      (n) => n.data.id === natesanFamily.id
+    );
+    assert.strictEqual(
+      natesanFamilyNode.data.label,
+      "Natesan",
+      "Natesan's family node label should be correct"
+    );
+
+    const tamilselviFamilyNode = familyTreeStore.nodes.find(
+      (n) => n.data.id === tamilselviFamily.id
+    );
+    assert.strictEqual(
+      tamilselviFamilyNode.data.label,
+      "Ramamoorthy\nTamilselvi",
+      "Tamilselvi's family node label should be correct"
+    );
+  });
 });
