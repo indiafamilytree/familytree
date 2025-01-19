@@ -49,7 +49,7 @@
 
 <script setup>
 import { ref, computed } from "vue";
-import { useFamilyTreeStore } from "../stores/familyTree";
+import { useFamilyTreeStore } from "@/stores/family-tree-store/index";
 
 const store = useFamilyTreeStore();
 store.initializeRootPerson({

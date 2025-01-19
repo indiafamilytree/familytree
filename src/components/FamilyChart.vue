@@ -12,7 +12,7 @@
 import cytoscape from "cytoscape";
 import fcose from "cytoscape-fcose";
 import { onMounted, ref, watch } from "vue";
-import { useFamilyTreeStore } from "@/stores/familyTree";
+import { useFamilyTreeStore } from "@/stores/family-tree-store/index";
 
 // Register the fcose layout
 cytoscape.use(fcose);

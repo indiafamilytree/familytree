@@ -1,5 +1,4 @@
 // family-tree-store/utils/addFamilyAndEdges.js
-
 export function addFamilyAndEdges(parent, child, relation, enableLogging) {
   const isDevelopment = enableLogging;
   if (isDevelopment) {
@@ -57,6 +56,7 @@ export function addFamilyAndEdges(parent, child, relation, enableLogging) {
     family.motherId = parent.id;
   } else if (relation === "Wife") {
     family.motherId = child.id;
+    family.fatherId = parent.id;
   } else if (relation === "Husband") {
     family.fatherId = child.id;
   } else if (relation === "Son" || relation === "Daughter") {
