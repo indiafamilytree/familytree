@@ -13,8 +13,10 @@ export function addFamilyAndEdges(parent, child, relation, enableLogging) {
     // Find family by parentId (father)
     family = this.families.find((f) => f.fatherId === parent.id);
   } else if (relation === "Son" || relation === "Daughter") {
-    // Find family by parentId (father) for son and daughter
-    family = this.families.find((f) => f.fatherId === parent.id);
+    // Find family by parentId for son and daughter
+    family = this.families.find(
+      (f) => f.fatherId === parent.id || f.motherId === parent.id
+    );
   } else if (relation === "Father") {
     // Find family by childId and making sure fatherId is null or equal to parent id
     family = this.families.find(
@@ -35,12 +37,18 @@ export function addFamilyAndEdges(parent, child, relation, enableLogging) {
     const familyId = `family-${this.families.length + 1}`;
     family = {
       id: familyId,
-      fatherId: relation === "Mother" || relation === "Wife" ? null : parent.id,
+      fatherId:
+        relation === "Mother" ||
+        relation === "Wife" ||
+        (relation === "Son" && parent.gender === "female") ||
+        (relation === "Daughter" && parent.gender === "female")
+          ? null
+          : parent.id,
       motherId:
         relation === "Father" ||
         relation === "Husband" ||
-        relation === "Son" ||
-        relation === "Daughter"
+        (relation === "Son" && parent.gender === "male") ||
+        (relation === "Daughter" && parent.gender === "male")
           ? null
           : parent.id,
       childrenIds:
@@ -75,7 +83,11 @@ export function addFamilyAndEdges(parent, child, relation, enableLogging) {
   } else if (relation === "Husband") {
     family.fatherId = child.id;
   } else if (relation === "Son" || relation === "Daughter") {
-    family.fatherId = parent.id;
+    if (parent.gender === "male") {
+      family.fatherId = parent.id;
+    } else if (parent.gender === "female") {
+      family.motherId = parent.id;
+    }
     // Ensure child is in childrenIds
     if (!family.childrenIds.includes(child.id)) {
       family.childrenIds.push(child.id);
@@ -140,10 +152,18 @@ export function addFamilyAndEdges(parent, child, relation, enableLogging) {
       child.gender === "female" ? "Daughter" : "Son"
     );
   } else if (relation === "Son") {
-    addEdge(parent.id, familyNodeId, "Father");
+    addEdge(
+      parent.id,
+      familyNodeId,
+      parent.gender === "female" ? "Mother" : "Father"
+    );
     addEdge(familyNodeId, child.id, "Son");
   } else if (relation === "Daughter") {
-    addEdge(parent.id, familyNodeId, "Father");
+    addEdge(
+      parent.id,
+      familyNodeId,
+      parent.gender === "female" ? "Mother" : "Father"
+    );
     addEdge(familyNodeId, child.id, "Daughter");
   } else if (relation === "Wife") {
     addEdge(parent.id, familyNodeId, "Father");
