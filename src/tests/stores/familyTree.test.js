@@ -303,4 +303,41 @@ describe("FamilyTree", function () {
     );
     assert.ok(familyToSonEdge, "Family to son edge should be created");
   });
+
+  it("should create only one family when adding a son and a daughter to the root person", function () {
+    // Add a son linked to the root person
+    const son = {
+      name: "Peter Doe",
+      gender: "male",
+      relation: "son",
+      linkedPersonId: "person-1", // Linked to the root person (father)
+    };
+    familyTreeStore.addPerson(son);
+
+    // Add a daughter linked to the root person
+    const daughter = {
+      name: "Jane Doe",
+      gender: "female",
+      relation: "daughter",
+      linkedPersonId: "person-1", // Linked to the root person (father)
+    };
+    familyTreeStore.addPerson(daughter);
+
+    // Assertions:
+    const families = familyTreeStore.families;
+    assert.strictEqual(families.length, 1, "Only one family should exist");
+
+    const family = families[0];
+    assert.strictEqual(
+      family.fatherId,
+      "person-1",
+      "Father ID should be correct"
+    );
+    assert.strictEqual(family.motherId, null, "Mother ID should be null");
+    assert.deepStrictEqual(
+      family.childrenIds,
+      ["person-2", "person-3"],
+      "Children IDs should be correct"
+    );
+  });
 });

@@ -1,4 +1,5 @@
 // family-tree-store/utils/addFamilyAndEdges.js
+
 export function addFamilyAndEdges(parent, child, relation, enableLogging) {
   const isDevelopment = enableLogging;
   if (isDevelopment) {
@@ -10,6 +11,9 @@ export function addFamilyAndEdges(parent, child, relation, enableLogging) {
   let family;
   if (relation === "Wife") {
     // Find family by parentId (father)
+    family = this.families.find((f) => f.fatherId === parent.id);
+  } else if (relation === "Son" || relation === "Daughter") {
+    // Find family by parentId (father) for son and daughter
     family = this.families.find((f) => f.fatherId === parent.id);
   } else {
     // Original logic for other relations
@@ -61,15 +65,10 @@ export function addFamilyAndEdges(parent, child, relation, enableLogging) {
     family.fatherId = child.id;
   } else if (relation === "Son" || relation === "Daughter") {
     family.fatherId = parent.id;
-  }
-
-  // Ensure child is in childrenIds
-  if (
-    !family.childrenIds.includes(child.id) &&
-    relation !== "Wife" &&
-    relation !== "Husband"
-  ) {
-    family.childrenIds.push(child.id);
+    // Ensure child is in childrenIds
+    if (!family.childrenIds.includes(child.id)) {
+      family.childrenIds.push(child.id);
+    }
   }
 
   // Update family node label
@@ -122,8 +121,10 @@ export function addFamilyAndEdges(parent, child, relation, enableLogging) {
     addEdge(parent.id, familyNodeId, "Mother");
     addEdge(familyNodeId, child.id, "Son");
   } else if (relation === "Son") {
+    addEdge(parent.id, familyNodeId, "Father");
     addEdge(familyNodeId, child.id, "Son");
   } else if (relation === "Daughter") {
+    addEdge(parent.id, familyNodeId, "Father");
     addEdge(familyNodeId, child.id, "Daughter");
   } else if (relation === "Wife") {
     addEdge(parent.id, familyNodeId, "Father");
