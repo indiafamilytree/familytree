@@ -1,6 +1,6 @@
 import { strict as assert } from "assert";
 import { setActivePinia, createPinia } from "pinia";
-import { useFamilyTreeStore } from "../../stores/familyTree.js";
+import { useFamilyTreeStore } from "../../stores/family-tree-store/index.js";
 
 describe("FamilyTree", function () {
   let familyTreeStore;
