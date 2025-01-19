@@ -220,7 +220,7 @@ describe("FamilyTree", function () {
 
   it("should add a wife (mother) to an existing father-son family", function () {
     // Add a father first
-    let logging = true;
+    let logging = false;
     familyTreeStore.addPerson(
       {
         name: "John Smith",
@@ -263,13 +263,14 @@ describe("FamilyTree", function () {
   });
 
   it("should add a son without requiring a mother", function () {
+    let logging = true;
     const son = {
       name: "Peter Doe",
       gender: "male",
       relation: "son",
       linkedPersonId: "person-1", // Linked to the root person (father)
     };
-    familyTreeStore.addPerson(son);
+    familyTreeStore.addPerson(son, logging);
 
     // Assertions:
     const peterDoe = familyTreeStore.persons.find(

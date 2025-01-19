@@ -22,15 +22,14 @@ export function addFamilyAndEdges(parent, child, relation, enableLogging) {
     const familyId = `family-${this.families.length + 1}`;
     family = {
       id: familyId,
-      fatherId:
-        relation === "Mother" ||
-        relation === "Wife" ||
+      fatherId: relation === "Mother" || relation === "Wife" ? null : parent.id,
+      motherId:
+        relation === "Father" ||
+        relation === "Husband" ||
         relation === "Son" ||
         relation === "Daughter"
           ? null
           : parent.id,
-      motherId:
-        relation === "Father" || relation === "Husband" ? null : parent.id,
       childrenIds: [child.id],
     };
     this.families.push(family);
@@ -60,6 +59,8 @@ export function addFamilyAndEdges(parent, child, relation, enableLogging) {
     family.motherId = child.id;
   } else if (relation === "Husband") {
     family.fatherId = child.id;
+  } else if (relation === "Son" || relation === "Daughter") {
+    family.fatherId = parent.id;
   }
 
   // Ensure child is in childrenIds
