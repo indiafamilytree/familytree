@@ -255,16 +255,12 @@ describe("FamilyTree", function () {
 
   it("should add a wife (mother) to an existing father-son family", function () {
     // Add a father first
-    let logging = false;
-    familyTreeStore.addPerson(
-      {
-        name: "John Smith",
-        gender: "male",
-        relation: "father",
-        linkedPersonId: "person-1", // Linked to the root person (son)
-      },
-      logging
-    );
+    familyTreeStore.addPerson({
+      name: "John Smith",
+      gender: "male",
+      relation: "father",
+      linkedPersonId: "person-1", // Linked to the root person (son)
+    });
 
     // Add a wife (mother) linked to the father
     const wife = {
@@ -273,7 +269,7 @@ describe("FamilyTree", function () {
       relation: "wife",
       linkedPersonId: "person-2", // Linked to the father (person-2)
     };
-    familyTreeStore.addPerson(wife, logging);
+    familyTreeStore.addPerson(wife);
 
     // Assertions
     const families = familyTreeStore.families;
@@ -294,6 +290,41 @@ describe("FamilyTree", function () {
       family.childrenIds,
       ["person-1"],
       "Children IDs should be correct"
+    );
+
+    // Check for correct edges
+    const fatherToFamilyEdge = familyTreeStore.edges.find(
+      (e) =>
+        e.data.source === "person-2" &&
+        e.data.target === family.id &&
+        e.data.label === "Father"
+    );
+    assert.ok(fatherToFamilyEdge, "Father to family edge should exist");
+
+    const motherToFamilyEdge = familyTreeStore.edges.find(
+      (e) =>
+        e.data.source === "person-3" &&
+        e.data.target === family.id &&
+        e.data.label === "Mother"
+    );
+    assert.ok(motherToFamilyEdge, "Mother to family edge should exist");
+
+    const familyToChildEdge = familyTreeStore.edges.find(
+      (e) =>
+        e.data.source === family.id &&
+        e.data.target === "person-1" &&
+        e.data.label === "Son"
+    );
+    assert.ok(familyToChildEdge, "Family to child edge should exist");
+
+    // Check family node label
+    const familyNode = familyTreeStore.nodes.find(
+      (n) => n.data.id === family.id
+    );
+    assert.strictEqual(
+      familyNode.data.label,
+      "John Smith\nJane Doe",
+      "Family node label should be correct"
     );
   });
 
@@ -449,6 +480,91 @@ describe("FamilyTree", function () {
     const daughterEdge = familyTreeStore.edges.find(
       (e) =>
         e.data.source === wifeFatherFamily.id &&
+        e.data.target === "person-2" &&
+        e.data.label === "Daughter"
+    );
+    assert.ok(daughterEdge, "Daughter edge should exist");
+  });
+
+  it("should correctly add mother of the wife after adding wife and father of wife", function () {
+    // 1. Add the wife of the root person
+    let logging = false;
+    const wife = {
+      name: "Selvi", // Wife's name
+      gender: "female",
+      relation: "wife",
+      linkedPersonId: "person-1", // Linked to the root person
+    };
+    familyTreeStore.addPerson(wife, logging);
+
+    // 2. Add the father of the wife
+    const fatherOfWife = {
+      name: "Goindasamy", // Father's name
+      gender: "male",
+      relation: "father",
+      linkedPersonId: "person-2", // Linked to the wife
+    };
+    familyTreeStore.addPerson(fatherOfWife, logging);
+
+    // 3. Add the mother of the wife
+    const motherOfWife = {
+      name: "WifeMother", // Mother's name
+      gender: "female",
+      relation: "mother",
+      linkedPersonId: "person-2", // Linked to the wife
+    };
+    familyTreeStore.addPerson(motherOfWife, logging);
+
+    // Assertions:
+
+    // Check that there are only two families
+    assert.strictEqual(
+      familyTreeStore.families.length,
+      2,
+      "Two families should exist"
+    );
+
+    // Find the family of the root person
+    const rootPersonFamily = familyTreeStore.families.find(
+      (f) => f.fatherId === "person-1" && f.motherId === "person-2"
+    );
+    assert.ok(rootPersonFamily, "Root person's family should exist");
+
+    // Check that the root person's family doesn't have children
+    assert.strictEqual(
+      rootPersonFamily.childrenIds.length,
+      0,
+      "Root person's family should not have children"
+    );
+
+    // Find the family of the wife's parents
+    const wifeParentsFamily = familyTreeStore.families.find(
+      (f) => f.fatherId === "person-3" && f.motherId === "person-4"
+    );
+    assert.ok(wifeParentsFamily, "Wife's parents' family should exist");
+
+    // Check that the family node label is correct
+    const wifeParentsFamilyNode = familyTreeStore.nodes.find(
+      (n) => n.data.id === wifeParentsFamily.id
+    );
+    assert.strictEqual(
+      wifeParentsFamilyNode.data.label,
+      "Goindasamy\nWifeMother",
+      "Wife's parents' family label should be correct"
+    );
+
+    // Check for correct edges
+    const motherEdge = familyTreeStore.edges.find(
+      (e) =>
+        e.data.source === "person-4" &&
+        e.data.target === wifeParentsFamily.id &&
+        e.data.label === "Mother"
+    );
+    assert.ok(motherEdge, "Mother edge should exist");
+
+    const daughterEdge = familyTreeStore.edges.find(
+      (e) =>
+        e.data.source === wifeParentsFamily.id &&
         e.data.target === "person-2" &&
         e.data.label === "Daughter"
     );
