@@ -15,6 +15,13 @@ export function addFamilyAndEdges(parent, child, relation, enableLogging) {
   } else if (relation === "Son" || relation === "Daughter") {
     // Find family by parentId (father) for son and daughter
     family = this.families.find((f) => f.fatherId === parent.id);
+  } else if (relation === "Father") {
+    // Find family by childId and parentId for father
+    family = this.families.find(
+      (f) =>
+        f.childrenIds.includes(child.id) &&
+        (!f.fatherId || f.fatherId === parent.id)
+    );
   } else {
     // Original logic for other relations
     family = this.families.find((f) => f.childrenIds.includes(child.id));
@@ -116,10 +123,18 @@ export function addFamilyAndEdges(parent, child, relation, enableLogging) {
 
   if (relation === "Father") {
     addEdge(parent.id, familyNodeId, "Father");
-    addEdge(familyNodeId, child.id, "Son");
+    addEdge(
+      familyNodeId,
+      child.id,
+      child.gender === "female" ? "Daughter" : "Son"
+    );
   } else if (relation === "Mother") {
     addEdge(parent.id, familyNodeId, "Mother");
-    addEdge(familyNodeId, child.id, "Son");
+    addEdge(
+      familyNodeId,
+      child.id,
+      child.gender === "female" ? "Daughter" : "Son"
+    );
   } else if (relation === "Son") {
     addEdge(parent.id, familyNodeId, "Father");
     addEdge(familyNodeId, child.id, "Son");
