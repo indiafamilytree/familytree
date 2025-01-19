@@ -1,11 +1,12 @@
+<!-- filepath: /Users/nkannaiyan/Code/ChatGPTApps/FamilyTree/family-tree-app/src/App.vue -->
 <template>
-  <PersonForm />
-  <MarriageForm />
-  <FamilyChart />
+  <div class="relative">
+    <PersonForm />
+    <FamilyChart />
+  </div>
 </template>
 
 <script setup>
 import FamilyChart from "@/components/FamilyChart.vue";
-import PersonForm from "./components/PersonForm.vue";
-import MarriageForm from "./components/MarriageForm.vue";
+import PersonForm from "@/components/PersonForm.vue";
 </script>

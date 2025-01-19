@@ -1,3 +1,4 @@
+<!-- filepath: /Users/nkannaiyan/Code/ChatGPTApps/FamilyTree/family-tree-app/src/components/FamilyChart.vue -->
 <template>
   <div>
     <div
@@ -10,13 +11,14 @@
 <script setup>
 import cytoscape from "cytoscape";
 import fcose from "cytoscape-fcose";
-import { onMounted } from "vue";
+import { onMounted, ref, watch } from "vue";
 import { useFamilyTreeStore } from "@/stores/familyTree";
 
 // Register the fcose layout
 cytoscape.use(fcose);
 
 const familyTreeStore = useFamilyTreeStore();
+const cy = ref(null);
 
 const layoutConfig = {
   name: "fcose",
@@ -72,18 +74,18 @@ const styleConfig = [
   },
 ];
 
-onMounted(() => {
-  const cy = cytoscape({
+const initializeChart = () => {
+  cy.value = cytoscape({
     container: document.getElementById("cy"),
     elements: [...familyTreeStore.nodes, ...familyTreeStore.edges],
     layout: layoutConfig,
     style: styleConfig,
   });
 
-  cy.layout(layoutConfig).run();
+  cy.value.layout(layoutConfig).run();
 
   // Enable editing on double-click
-  cy.on("cxttap", "node", (event) => {
+  cy.value.on("cxttap", "node", (event) => {
     const node = event.target;
     const newName = prompt("Edit Name:", node.data("label"));
     if (newName) {
@@ -95,7 +97,7 @@ onMounted(() => {
     }
   });
 
-  cy.on("cxttap", "edge", (event) => {
+  cy.value.on("cxttap", "edge", (event) => {
     const edge = event.target;
     const newLabel = prompt("Edit Relation:", edge.data("label"));
     if (newLabel) {
@@ -108,13 +110,13 @@ onMounted(() => {
   });
 
   // Center the user node
-  cy.on("layoutstop", () => {
+  /*  cy.value.on("layoutstop", () => {
     const focusedNode = familyTreeStore.nodes.find(
       (node) => node.data.id === familyTreeStore.user
     );
     if (focusedNode) {
-      const cyNode = cy.getElementById(focusedNode.data.id);
-      cy.animate({
+      const cyNode = cy.value.getElementById(focusedNode.data.id);
+      cy.value.animate({
         center: {
           eles: cyNode,
         },
@@ -123,6 +125,26 @@ onMounted(() => {
       });
     }
   });
+  */
+};
+
+watch(
+  () => [familyTreeStore.nodes, familyTreeStore.edges],
+  () => {
+    if (cy.value) {
+      cy.value.elements().remove();
+      cy.value.add([...familyTreeStore.nodes, ...familyTreeStore.edges]);
+      cy.value.layout(layoutConfig).run();
+      cy.value.fit(); // Ensure all nodes are visible
+    } else {
+      initializeChart();
+    }
+  },
+  { deep: true }
+);
+
+onMounted(() => {
+  initializeChart();
 });
 </script>
 
