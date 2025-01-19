@@ -261,4 +261,45 @@ describe("FamilyTree", function () {
       "Children IDs should be correct"
     );
   });
+
+  it("should add a son without requiring a mother", function () {
+    const son = {
+      name: "Peter Doe",
+      gender: "male",
+      relation: "son",
+      linkedPersonId: "person-1", // Linked to the root person (father)
+    };
+    familyTreeStore.addPerson(son);
+
+    // Assertions:
+    const peterDoe = familyTreeStore.persons.find(
+      (p) => p.name === "Peter Doe"
+    );
+    assert.ok(peterDoe, "Peter Doe should be added");
+
+    const family = familyTreeStore.families.find((f) =>
+      f.childrenIds.includes(peterDoe.id)
+    );
+    assert.ok(family, "A family should be created");
+    assert.strictEqual(
+      family.fatherId,
+      "person-1",
+      "Father ID should be correct"
+    );
+    assert.strictEqual(family.motherId, null, "Mother ID should be null"); // Mother is not added
+    assert.ok(
+      family.childrenIds.includes(peterDoe.id),
+      "Son should be in childrenIds"
+    );
+
+    const familyNodeId = `family-1`; // Assuming only one family at this point
+
+    const familyToSonEdge = familyTreeStore.edges.find(
+      (e) =>
+        e.data.source === familyNodeId &&
+        e.data.target === peterDoe.id &&
+        e.data.label === "Son"
+    );
+    assert.ok(familyToSonEdge, "Family to son edge should be created");
+  });
 });
