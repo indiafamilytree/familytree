@@ -18,7 +18,7 @@
 <script setup>
 import cytoscape from "cytoscape";
 import fcose from "cytoscape-fcose";
-import { onMounted, ref, watch, nextTick } from "vue";
+import { onMounted, ref, watch, nextTick, onUnmounted } from "vue";
 import { useFamilyTreeStore } from "@/stores/family-tree-store/index";
 
 // Register the fcose layout
@@ -213,25 +213,21 @@ const initializeChart = () => {
   });
 
   // --- Click to Show Popup ---
-  const showPersonDetails = (node, event) => {
+  const showPersonDetails = (node) => {
     console.log("showPersonDetails called");
     selectedNodeData.value = node.data();
     console.log("Selected node data:", selectedNodeData.value);
 
-    // Ensure the canvas is correctly selected
-    const canvas = document.querySelector("#cy canvas");
-    if (!canvas) {
-      console.error("Canvas element not found within #cy");
-      return;
-    }
+    // Get the rendered position of the node
+    const renderedPosition = node.renderedPosition();
 
-    const rect = canvas.getBoundingClientRect();
-    console.log("Canvas bounding rect:", rect);
+    // Get the container of Cytoscape
+    const container = cy.value.container();
 
-    // Calculate the position relative to the canvas
-    const position = event.position || event.cyPosition;
-    popupX.value = rect.left + position.x + window.scrollX + "px";
-    popupY.value = rect.top + position.y + window.scrollY - 100 + "px"; // Adjust position as needed
+    // Calculate the position of the popup
+    popupX.value = renderedPosition.x + container.offsetLeft + "px";
+    popupY.value = renderedPosition.y + container.offsetTop + "px";
+
     console.log("Popup position (X, Y):", popupX.value, popupY.value);
 
     showPopup.value = true;
@@ -246,7 +242,7 @@ const initializeChart = () => {
     if (!clickTimeout) {
       // If no timeout is set, set one and show the popup
       clickTimeout = setTimeout(() => {
-        showPersonDetails(event.target, event);
+        showPersonDetails(event.target);
         clickTimeout = null; // Clear timeout
       }, 300); // Delay to differentiate from double click, adjust as needed
     } else {
@@ -271,7 +267,14 @@ const initializeChart = () => {
     console.log("Window clicked");
     if (showPopup.value) {
       const popupElement = document.querySelector(".popup");
-      if (popupElement && !popupElement.contains(event.target)) {
+      const cyContainer = document.querySelector("#cy");
+      // Check if the click is outside the popup and outside the Cytoscape container
+      if (
+        popupElement &&
+        !popupElement.contains(event.target) &&
+        cyContainer &&
+        !cyContainer.contains(event.target)
+      ) {
         closePopup();
       }
     }
@@ -332,6 +335,11 @@ watch(
 
 onMounted(() => {
   initializeChart();
+  window.addEventListener("click", handleWindowClick);
+});
+
+onUnmounted(() => {
+  window.removeEventListener("click", handleWindowClick);
 });
 
 function exportAsHighResPNG() {
