@@ -189,6 +189,29 @@ const initializeChart = () => {
 
   cy.value.layout(layoutConfig).run();
 
+  // --- Center on Root Person ---
+  const centerOnRoot = () => {
+    const rootNodeData = familyTreeStore.rootPerson; // Get the root person's data
+    console.log("centerOnRoot", rootNodeData);
+
+    if (rootNodeData) {
+      const rootNode = cy.value.getElementById(rootNodeData.id); // Get the node by ID
+      if (rootNode.length > 0) {
+        cy.value.center(rootNode);
+        console.log("centered on", rootNodeData.id);
+      } else {
+        console.warn(`Root node with ID ${rootNodeData.id} not found.`);
+      }
+    } else {
+      console.warn("Root person is not set in the store.");
+    }
+  };
+
+  // Call centerOnRoot after the layout has been applied and the graph is rendered
+  cy.value.ready(() => {
+    centerOnRoot();
+  });
+
   // --- Click to Show Popup ---
   const showPersonDetails = (node, event) => {
     console.log("showPersonDetails called");
@@ -370,6 +393,6 @@ const closePopup = () => {
 }
 
 .popup-content {
-  padding: 10px;
+  padding: 11px;
 }
 </style>
