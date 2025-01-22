@@ -27,11 +27,23 @@ cytoscape.use(fcose);
 const familyTreeStore = useFamilyTreeStore();
 const cy = ref(null);
 
+// Initialize root person if not already initialized
+if (!familyTreeStore.rootPerson) {
+  familyTreeStore.initializeRootPerson({
+    name: "Kannaiyan",
+    gender: "male",
+  });
+}
+
 // Popup state
 const showPopup = ref(false);
 const popupX = ref(0);
 const popupY = ref(0);
 const selectedNodeData = ref({}); // To store data of the selected node
+
+// Form data for adding a new related person - NOW IN TOP-LEVEL SCOPE
+const newPersonName = ref("");
+const newPersonRelation = ref("father");
 
 // --- Color Palette (50 colors) ---
 const colorPalette = [
@@ -175,6 +187,23 @@ const styleConfig = [
   },
 ];
 
+// Define handleWindowClick *outside* of initializeChart and *before* onMounted
+const handleWindowClick = (event) => {
+  console.log("Window clicked");
+  if (showPopup.value) {
+    const popupElement = document.querySelector(".popup");
+    const cyContainer = document.querySelector("#cy");
+    if (
+      popupElement &&
+      !popupElement.contains(event.target) &&
+      cyContainer &&
+      !cyContainer.contains(event.target)
+    ) {
+      closePopup();
+    }
+  }
+};
+
 const initializeChart = () => {
   cy.value = cytoscape({
     container: document.getElementById("cy"),
@@ -191,14 +220,11 @@ const initializeChart = () => {
 
   // --- Center on Root Person ---
   const centerOnRoot = () => {
-    const rootNodeData = familyTreeStore.rootPerson; // Get the root person's data
-    console.log("centerOnRoot", rootNodeData);
-
+    const rootNodeData = familyTreeStore.rootPerson;
     if (rootNodeData) {
-      const rootNode = cy.value.getElementById(rootNodeData.id); // Get the node by ID
+      const rootNode = cy.value.getElementById(rootNodeData.id);
       if (rootNode.length > 0) {
         cy.value.center(rootNode);
-        console.log("centered on", rootNodeData.id);
       } else {
         console.warn(`Root node with ID ${rootNodeData.id} not found.`);
       }
@@ -214,9 +240,7 @@ const initializeChart = () => {
 
   // --- Click to Show Popup ---
   const showPersonDetails = (node) => {
-    console.log("showPersonDetails called");
     selectedNodeData.value = node.data();
-    console.log("Selected node data:", selectedNodeData.value);
 
     // Get the rendered position of the node
     const renderedPosition = node.renderedPosition();
@@ -228,28 +252,20 @@ const initializeChart = () => {
     popupX.value = renderedPosition.x + container.offsetLeft + "px";
     popupY.value = renderedPosition.y + container.offsetTop + "px";
 
-    console.log("Popup position (X, Y):", popupX.value, popupY.value);
-
     showPopup.value = true;
-    console.log("showPopup set to:", showPopup.value);
   };
 
-  let clickTimeout = null; // Timeout to differentiate between single and double click
+  let clickTimeout = null;
 
   cy.value.on("tap", "node", (event) => {
-    console.log("Node tapped:", event.target.data());
-
     if (!clickTimeout) {
-      // If no timeout is set, set one and show the popup
       clickTimeout = setTimeout(() => {
         showPersonDetails(event.target);
-        clickTimeout = null; // Clear timeout
-      }, 300); // Delay to differentiate from double click, adjust as needed
+        clickTimeout = null;
+      }, 300);
     } else {
-      // If a timeout is already set, it means this is a second click (double click)
       clearTimeout(clickTimeout);
       clickTimeout = null;
-      // Handle double click (e.g., edit name)
       const node = event.target;
       const newName = prompt("Edit Name:", node.data("label"));
       if (newName) {
@@ -259,37 +275,6 @@ const initializeChart = () => {
         );
         if (storeNode) storeNode.data.label = newName;
       }
-    }
-  });
-
-  // Close the popup if clicking outside of it
-  const handleWindowClick = (event) => {
-    console.log("Window clicked");
-    if (showPopup.value) {
-      const popupElement = document.querySelector(".popup");
-      const cyContainer = document.querySelector("#cy");
-      // Check if the click is outside the popup and outside the Cytoscape container
-      if (
-        popupElement &&
-        !popupElement.contains(event.target) &&
-        cyContainer &&
-        !cyContainer.contains(event.target)
-      ) {
-        closePopup();
-      }
-    }
-  };
-
-  // Use a watcher to add/remove the event listener based on showPopup
-  watch(showPopup, (newValue, oldValue) => {
-    if (newValue) {
-      // Add the event listener when showPopup becomes true
-      nextTick(() => {
-        window.addEventListener("click", handleWindowClick);
-      });
-    } else {
-      // Remove the event listener when showPopup becomes false
-      window.removeEventListener("click", handleWindowClick);
     }
   });
 
@@ -333,6 +318,7 @@ watch(
   { deep: true }
 );
 
+// Call initializeChart in onMounted *after* handleWindowClick is defined
 onMounted(() => {
   initializeChart();
   window.addEventListener("click", handleWindowClick);
@@ -343,37 +329,33 @@ onUnmounted(() => {
 });
 
 function exportAsHighResPNG() {
-  const desiredWidthInches = 10; // Example: 10 inches wide (adjust as needed)
-  const desiredHeightInches = 8; // Example: 8 inches high (adjust as needed)
+  const desiredWidthInches = 10;
+  const desiredHeightInches = 8;
   const dpi = 300;
 
   const desiredWidthPixels = desiredWidthInches * dpi;
   const desiredHeightPixels = desiredHeightInches * dpi;
 
-  // Get the bounding box of the entire graph
   const bounds = cy.value.elements().boundingBox();
   const currentWidth = bounds.w;
   const currentHeight = bounds.h;
 
-  // Calculate the scale factor to fit the graph within the desired dimensions
   const scale = Math.max(
     desiredWidthPixels / currentWidth,
     desiredHeightPixels / currentHeight
   );
 
-  // Export the PNG at the calculated scale
   const pngBlob = cy.value.png({
     output: "blob",
-    bg: "transparent", // Or your desired background color
-    full: true, // Capture the entire graph
+    bg: "transparent",
+    full: true,
     scale: scale,
   });
 
-  // Create a download link for the high-resolution PNG
   const url = URL.createObjectURL(pngBlob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = "family-tree.png"; // Name of the file
+  link.download = "family-tree.png";
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
@@ -381,8 +363,63 @@ function exportAsHighResPNG() {
 }
 
 const closePopup = () => {
-  console.log("closePopup called");
   showPopup.value = false;
+  newPersonName.value = "";
+  newPersonRelation.value = "father";
+};
+
+const addRelatedPerson = () => {
+  let gender;
+  if (
+    newPersonRelation.value === "father" ||
+    newPersonRelation.value === "son" ||
+    newPersonRelation.value === "husband"
+  ) {
+    gender = "male";
+  } else if (
+    newPersonRelation.value === "mother" ||
+    newPersonRelation.value === "daughter" ||
+    newPersonRelation.value === "wife"
+  ) {
+    gender = "female";
+  }
+  familyTreeStore.addPerson({
+    name: newPersonName.value,
+    gender: gender,
+    relation: newPersonRelation.value,
+    linkedPersonId: selectedNodeData.value.id, // Use the selected node's ID
+  });
+
+  closePopup();
+};
+
+const downloadJson = () => {
+  const dataStr =
+    "data:text/json;charset=utf-8," +
+    encodeURIComponent(JSON.stringify(familyTreeStore.persons));
+  const downloadAnchorNode = document.createElement("a");
+  downloadAnchorNode.setAttribute("href", dataStr);
+  downloadAnchorNode.setAttribute("download", "family-tree.json");
+  document.body.appendChild(downloadAnchorNode);
+  downloadAnchorNode.click();
+  downloadAnchorNode.remove();
+};
+
+const handleFileImport = (event) => {
+  const file = event.target.files[0];
+  if (file) {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const importedData = JSON.parse(e.target.result);
+        familyTreeStore.importPersons(importedData, familyTreeStore);
+      } catch (error) {
+        console.error("Error parsing JSON:", error);
+        // Handle error, e.g., show an error message to the user
+      }
+    };
+    reader.readAsText(file);
+  }
 };
 </script>
 
