@@ -1,9 +1,12 @@
-import { addFather } from "./relations/addFather.js";
-import { addMother } from "./relations/addMother.js";
-import { addWife } from "./relations/addWife.js";
-import { addSon } from "./relations/addSon.js";
-import { addDaughter } from "./relations/addDaughter.js";
-import { addHusband } from "./relations/addHusband.js";
+import {
+  addFather,
+  addMother,
+  addWife,
+  addSon,
+  addDaughter,
+  addHusband,
+} from "./relations/index.js";
+import { addFamilyAndEdges } from "../utils/addFamilyAndEdges.js";
 
 export function addPerson(person, enableLogging = false) {
   const isDevelopment = enableLogging;
@@ -17,18 +20,8 @@ export function addPerson(person, enableLogging = false) {
     console.log("addPerson called with:", person);
   }
 
-  if (
-    !person.name ||
-    !person.gender ||
-    !person.relation ||
-    !person.linkedPersonId
-  ) {
+  if (!person.name || !person.gender || !person.relation) {
     console.error("Invalid person data:", person);
-    return;
-  }
-
-  if (!this.persons.find((p) => p.id === person.linkedPersonId)) {
-    console.error("linkedPersonId does not exist:", person.linkedPersonId);
     return;
   }
 
@@ -39,12 +32,15 @@ export function addPerson(person, enableLogging = false) {
     data: { id: newId, label: person.name, gender: person.gender },
   });
 
-  const linkedPerson = this.persons.find((p) => p.id === person.linkedPersonId);
+  let linkedPerson = null;
+  if (person.linkedPersonId) {
+    linkedPerson = this.persons.find((p) => p.id === person.linkedPersonId);
+  }
 
   if (person.relation === "father") {
-    addFather.call(this, newPerson, linkedPerson, enableLogging);
+    addFather.call(this, newPerson, enableLogging);
   } else if (person.relation === "mother") {
-    addMother.call(this, newPerson, linkedPerson, enableLogging);
+    addMother.call(this, newPerson, enableLogging);
   } else if (person.relation === "wife") {
     addWife.call(this, linkedPerson, newPerson, enableLogging);
   } else if (person.relation === "husband") {
@@ -53,13 +49,21 @@ export function addPerson(person, enableLogging = false) {
     addSon.call(this, linkedPerson, newPerson, enableLogging);
   } else if (person.relation === "daughter") {
     addDaughter.call(this, linkedPerson, newPerson, enableLogging);
+  } else {
+    addFamilyAndEdges.call(
+      this,
+      newPerson,
+      person.relation,
+      enableLogging,
+      person.linkedFamilyId
+    );
   }
 
   if (isDevelopment) {
     console.log("addPerson AFTER:");
-    console.log("  Current persons:", this.persons);
-    console.log("  Current families:", this.families);
-    console.log("  Current nodes:", this.nodes);
-    console.log("  Current edges:", this.edges);
+    console.log("   Current persons:", this.persons);
+    console.log("   Current families:", this.families);
+    console.log("   Current nodes:", this.nodes);
+    console.log("   Current edges:", this.edges);
   }
 }

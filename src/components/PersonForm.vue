@@ -24,13 +24,13 @@
       </select>
 
       <select
-        v-model="linkedPersonId"
-        id="linkedPersonId"
-        required
+        v-model="linkedFamilyId"
+        id="linkedFamilyId"
         class="px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
       >
-        <option v-for="person in persons" :key="person.id" :value="person.id">
-          {{ person.name }}
+        <option value="">Select Family (Optional)</option>
+        <option v-for="family in families" :key="family.id" :value="family.id">
+          {{ family.id }}
         </option>
       </select>
 
@@ -73,16 +73,19 @@ store.initializeRootPerson({
   gender: "male",
 });
 const persons = computed(() => store.persons);
+// Add computed property for families
+const families = computed(() => store.families);
 
 const name = ref("");
 const relation = ref("father");
-const linkedPersonId = ref("");
+// Update linkedPersonId to linkedFamilyId
+const linkedFamilyId = ref("");
 
 const addPerson = () => {
   console.log("Adding person:", {
     name: name.value,
     relation: relation.value,
-    linkedPersonId: linkedPersonId.value,
+    linkedFamilyId: linkedFamilyId.value, // Use linkedFamilyId
   });
 
   let gender;
@@ -102,18 +105,30 @@ const addPerson = () => {
 
   console.log("Determined gender:", gender);
 
+  // Find the linkedPersonId based on linkedFamilyId
+  let linkedPersonId = null;
+  if (linkedFamilyId.value) {
+    const linkedFamily = store.families.find(
+      (f) => f.id === linkedFamilyId.value
+    );
+    if (linkedFamily && linkedFamily.members.length > 0) {
+      // Assuming you want to link to the first person in the family
+      linkedPersonId = linkedFamily.members[0];
+    }
+  }
+
   store.addPerson({
     name: name.value,
     gender: gender,
     relation: relation.value,
-    linkedPersonId: linkedPersonId.value,
+    linkedPersonId: linkedPersonId, // Pass linkedPersonId to addPerson
   });
 
   console.log("Person added to store");
 
   name.value = "";
   relation.value = "father";
-  linkedPersonId.value = "";
+  linkedFamilyId.value = ""; // Reset linkedFamilyId
 
   console.log("Form reset");
 };

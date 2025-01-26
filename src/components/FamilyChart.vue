@@ -5,21 +5,23 @@
       style="width: 100%; height: 100vh; background-color: #f9f9f9"
     ></div>
     <button @click="exportAsHighResPNG">Export as PNG (300 DPI)</button>
-    <div v-if="showPopup" class="popup" :style="{ top: popupY, left: popupX }">
-      <div class="popup-content">
-        <h3>{{ selectedNodeData.label }}</h3>
-        <p>ID: {{ selectedNodeData.id }}</p>
-        <button @click="closePopup">Close</button>
-      </div>
-    </div>
+
+    <FamilyNodePopup
+      v-if="showPopup"
+      :familyData="selectedNodeData"
+      :popupX="popupX"
+      :popupY="popupY"
+      @close="closePopup"
+    />
   </div>
 </template>
 
 <script setup>
 import cytoscape from "cytoscape";
 import fcose from "cytoscape-fcose";
-import { onMounted, ref, watch, nextTick, onUnmounted } from "vue";
+import { onMounted, ref, watch, onUnmounted } from "vue";
 import { useFamilyTreeStore } from "@/stores/family-tree-store/index";
+import FamilyNodePopup from "@/components/FamilyNodePopup.vue"; // Import the new component
 
 // Register the fcose layout
 cytoscape.use(fcose);
@@ -37,13 +39,9 @@ if (!familyTreeStore.rootPerson) {
 
 // Popup state
 const showPopup = ref(false);
-const popupX = ref(0);
-const popupY = ref(0);
-const selectedNodeData = ref({}); // To store data of the selected node
-
-// Form data for adding a new related person - NOW IN TOP-LEVEL SCOPE
-const newPersonName = ref("");
-const newPersonRelation = ref("father");
+const popupX = ref("0"); // Initialize as strings
+const popupY = ref("0"); // Initialize as strings
+const selectedNodeData = ref(null); // To store data of the selected node
 
 // --- Color Palette (50 colors) ---
 const colorPalette = [
@@ -109,12 +107,14 @@ const layoutConfig = {
   padding: 30,
   spacingFactor: 1.2,
   nodeRepulsion: 4500,
-  idealEdgeLength: 100,
+  idealEdgeLength: 50, // Adjusted for better layout
   edgeElasticity: 0.45,
   nestingFactor: 0.1,
   gravity: 0.25,
   numIter: 2500,
   tile: true,
+  tilingPaddingVertical: 20, // Adjusted for better layout
+  tilingPaddingHorizontal: 20, // Adjusted for better layout
   packComponents: true,
 };
 
@@ -240,7 +240,8 @@ const initializeChart = () => {
 
   // --- Click to Show Popup ---
   const showPersonDetails = (node) => {
-    selectedNodeData.value = node.data();
+    console.log("showPersonDetails called", node.data());
+    selectedNodeData.value = node.data().isFamily ? node.data() : null;
 
     // Get the rendered position of the node
     const renderedPosition = node.renderedPosition();
@@ -249,31 +250,40 @@ const initializeChart = () => {
     const container = cy.value.container();
 
     // Calculate the position of the popup
-    popupX.value = renderedPosition.x + container.offsetLeft + "px";
-    popupY.value = renderedPosition.y + container.offsetTop + "px";
+    popupX.value = renderedPosition.x + container.offsetLeft + "px"; // Add "px" to make it a string
+    popupY.value = renderedPosition.y + container.offsetTop + "px"; // Add "px" to make it a string
 
     showPopup.value = true;
+    console.log("showPopup set to true");
   };
 
   let clickTimeout = null;
 
   cy.value.on("tap", "node", (event) => {
-    if (!clickTimeout) {
-      clickTimeout = setTimeout(() => {
-        showPersonDetails(event.target);
-        clickTimeout = null;
-      }, 300);
+    const node = event.target;
+    if (node.data("isFamily")) {
+      // Directly show the popup for family nodes
+      console.log("Family node clicked");
+      showPersonDetails(node);
     } else {
-      clearTimeout(clickTimeout);
-      clickTimeout = null;
-      const node = event.target;
-      const newName = prompt("Edit Name:", node.data("label"));
-      if (newName) {
-        node.data("label", newName);
-        const storeNode = familyTreeStore.nodes.find(
-          (n) => n.data.id === node.data("id")
-        );
-        if (storeNode) storeNode.data.label = newName;
+      // Existing logic for non-family nodes
+      if (!clickTimeout) {
+        clickTimeout = setTimeout(() => {
+          showPersonDetails(event.target);
+          clickTimeout = null;
+        }, 300);
+      } else {
+        clearTimeout(clickTimeout);
+        clickTimeout = null;
+        const node = event.target;
+        const newName = prompt("Edit Name:", node.data("label"));
+        if (newName) {
+          node.data("label", newName);
+          const storeNode = familyTreeStore.nodes.find(
+            (n) => n.data.id === node.data("id")
+          );
+          if (storeNode) storeNode.data.label = newName;
+        }
       }
     }
   });
@@ -306,7 +316,11 @@ const initializeChart = () => {
 
 watch(
   () => [familyTreeStore.nodes, familyTreeStore.edges],
-  () => {
+  (newValues, oldValues) => {
+    console.log("watch triggered");
+    console.log("  newValues:", newValues);
+    console.log("  oldValues:", oldValues);
+
     if (cy.value) {
       cy.value.elements().remove();
       cy.value.add([...familyTreeStore.nodes, ...familyTreeStore.edges]);
@@ -314,6 +328,9 @@ watch(
     } else {
       initializeChart();
     }
+
+    // Log nodes and edges after update
+    logNodesAndEdges();
   },
   { deep: true }
 );
@@ -364,62 +381,14 @@ function exportAsHighResPNG() {
 
 const closePopup = () => {
   showPopup.value = false;
-  newPersonName.value = "";
-  newPersonRelation.value = "father";
+  selectedNodeData.value = null;
+  console.log("closePopup called");
 };
 
-const addRelatedPerson = () => {
-  let gender;
-  if (
-    newPersonRelation.value === "father" ||
-    newPersonRelation.value === "son" ||
-    newPersonRelation.value === "husband"
-  ) {
-    gender = "male";
-  } else if (
-    newPersonRelation.value === "mother" ||
-    newPersonRelation.value === "daughter" ||
-    newPersonRelation.value === "wife"
-  ) {
-    gender = "female";
-  }
-  familyTreeStore.addPerson({
-    name: newPersonName.value,
-    gender: gender,
-    relation: newPersonRelation.value,
-    linkedPersonId: selectedNodeData.value.id, // Use the selected node's ID
-  });
-
-  closePopup();
-};
-
-const downloadJson = () => {
-  const dataStr =
-    "data:text/json;charset=utf-8," +
-    encodeURIComponent(JSON.stringify(familyTreeStore.persons));
-  const downloadAnchorNode = document.createElement("a");
-  downloadAnchorNode.setAttribute("href", dataStr);
-  downloadAnchorNode.setAttribute("download", "family-tree.json");
-  document.body.appendChild(downloadAnchorNode);
-  downloadAnchorNode.click();
-  downloadAnchorNode.remove();
-};
-
-const handleFileImport = (event) => {
-  const file = event.target.files[0];
-  if (file) {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      try {
-        const importedData = JSON.parse(e.target.result);
-        familyTreeStore.importPersons(importedData, familyTreeStore);
-      } catch (error) {
-        console.error("Error parsing JSON:", error);
-        // Handle error, e.g., show an error message to the user
-      }
-    };
-    reader.readAsText(file);
-  }
+// Function to log nodes and edges
+const logNodesAndEdges = () => {
+  console.log("Current Nodes:", cy.value.nodes().jsons());
+  console.log("Current Edges:", cy.value.edges().jsons());
 };
 </script>
 
@@ -427,17 +396,5 @@ const handleFileImport = (event) => {
 #cy {
   width: 100%;
   height: 100vh;
-}
-.popup {
-  position: absolute;
-  background-color: white;
-  border: 1px solid #ccc;
-  border-radius: 5px;
-  box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.3);
-  z-index: 10; /* Ensure the popup is above the Cytoscape canvas */
-}
-
-.popup-content {
-  padding: 11px;
 }
 </style>
