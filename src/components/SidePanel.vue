@@ -1,7 +1,11 @@
 <template>
-  <div class="side-panel">
+  <div
+    class="side-panel w-full h-full overflow-y-auto border-l border-gray-200 p-4 bg-gray-100"
+  >
     <div v-if="selectedPerson">
-      <h3 class="form-heading">Edit Person: {{ selectedPerson.name }}</h3>
+      <h3 class="text-lg font-bold mb-4">
+        Edit Person: {{ selectedPerson.name }}
+      </h3>
       <PersonNodeForm
         :personData="selectedPerson"
         @update:personData="updatePerson"
@@ -9,8 +13,14 @@
       />
     </div>
     <div v-else-if="selectedFamily">
-      <h3 class="form-heading">Edit Family: {{ selectedFamily.label }}</h3>
+      <h3 class="text-lg font-bold mb-4">
+        Edit Family: {{ selectedFamily.label }}
+      </h3>
       <FamilyNodeForm :familyData="selectedFamily" @close="closePanel" />
+    </div>
+    <div v-else-if="store.persons.length === 0">
+      <h3 class="text-lg font-bold mb-4">Add Person</h3>
+      <PersonForm />
     </div>
     <div v-else>
       <h3 class="text-lg font-bold mb-4">Select a node</h3>
@@ -42,6 +52,7 @@ const selectedFamily = ref(null);
 watch(
   () => props.selectedNodeData,
   (newNodeData) => {
+    console.log("Selected node data updated:", newNodeData);
     if (newNodeData) {
       if (newNodeData.isFamily) {
         selectedFamily.value = newNodeData;
@@ -72,6 +83,7 @@ function updatePerson(updatedPerson) {
 }
 
 function closePanel() {
+  console.log("Closing panel");
   selectedPerson.value = null;
   selectedFamily.value = null;
   emit("close");
@@ -86,7 +98,6 @@ function closePanel() {
   border-left: 1px solid #ccc;
   padding: 1rem;
   background-color: #f8f8f8;
-  /* No need for float: right; as flexbox handles positioning */
 }
 
 .form-heading {

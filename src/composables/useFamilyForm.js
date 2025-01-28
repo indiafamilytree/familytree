@@ -47,37 +47,24 @@ export function useFamilyForm() {
   function createImmediateFamily(person) {
     if (!person) return;
 
-    // Determine the existing family ID or create a new one
-    let existingFamily = familyTreeStore.families.find((f) =>
-      f.members.includes(person.id)
-    );
-    let familyId;
-    if (existingFamily) {
-      familyId = existingFamily.id;
-    } else {
-      familyId = `family-${familyTreeStore.families.length + 1}`;
-      familyTreeStore.families.push({
-        id: familyId,
-        members: [person.id],
-        husbandId: null,
-        wifeId: null,
-        sons: [],
-        daughters: [],
-      });
-      familyTreeStore.nodes.push({
-        data: { id: familyId, label: "Family", isFamily: true },
-      });
-    }
+    // Create a new family node
+    let familyId = `family-${familyTreeStore.families.length + 1}`;
+    familyTreeStore.families.push({
+      id: familyId,
+      members: [person.id], // Initially, the family only contains the person
+      husbandId: null,
+      wifeId: null,
+      sons: [],
+      daughters: [],
+    });
+    familyTreeStore.nodes.push({
+      data: { id: familyId, label: "Family", isFamily: true },
+    });
 
     // Add the person to the family members if not already present
-    if (
-      !familyTreeStore.families
-        .find((f) => f.id === familyId)
-        .members.includes(person.id)
-    ) {
-      familyTreeStore.families
-        .find((f) => f.id === familyId)
-        .members.push(person.id);
+    const family = familyTreeStore.families.find((f) => f.id === familyId);
+    if (!family.members.includes(person.id)) {
+      family.members.push(person.id);
     }
 
     // Add the spouse if provided
@@ -102,29 +89,16 @@ export function useFamilyForm() {
 
     // Update family members based on gender
     if (person.gender === "male") {
-      familyTreeStore.families.find((f) => f.id === familyId).husbandId =
-        person.id;
-      if (spouseId)
-        familyTreeStore.families.find((f) => f.id === familyId).wifeId =
-          spouseId;
+      family.husbandId = person.id;
+      if (spouseId) family.wifeId = spouseId;
     } else {
-      familyTreeStore.families.find((f) => f.id === familyId).wifeId =
-        person.id;
-      if (spouseId)
-        familyTreeStore.families.find((f) => f.id === familyId).husbandId =
-          spouseId;
+      family.wifeId = person.id;
+      if (spouseId) family.husbandId = spouseId;
     }
 
     // Add spouse to family members if new
-    if (
-      spouseId &&
-      !familyTreeStore.families
-        .find((f) => f.id === familyId)
-        .members.includes(spouseId)
-    ) {
-      familyTreeStore.families
-        .find((f) => f.id === familyId)
-        .members.push(spouseId);
+    if (spouseId && !family.members.includes(spouseId)) {
+      family.members.push(spouseId);
     }
 
     // Add or update the family node label
@@ -133,20 +107,14 @@ export function useFamilyForm() {
     );
     if (familyNode) {
       const husband = familyTreeStore.persons.find(
-        (p) =>
-          p.id ===
-          familyTreeStore.families.find((f) => f.id === familyId).husbandId
+        (p) => p.id === family.husbandId
       );
-      const wife = familyTreeStore.persons.find(
-        (p) =>
-          p.id ===
-          familyTreeStore.families.find((f) => f.id === familyId).wifeId
-      );
+      const wife = familyTreeStore.persons.find((p) => p.id === family.wifeId);
       familyNode.data.label =
         (husband ? husband.name : "") + (wife ? `\n${wife.name}` : "");
     }
 
-    // Add new sons and daughters
+    // Add new sons and daughters with the correct family ID
     newSons.value.forEach((son) => {
       familyTreeStore.addPerson({
         ...son,
@@ -162,12 +130,22 @@ export function useFamilyForm() {
       });
     });
 
-    // Add edge for the person to the family
-    if (person.gender === "male") {
+    // Add edge for the person to the family, only if not already added
+    if (
+      person.gender === "male" &&
+      !familyTreeStore.edges.some(
+        (e) => e.data.source === person.id && e.data.target === familyId
+      )
+    ) {
       familyTreeStore.edges.push({
         data: { source: person.id, target: familyId, label: "Husband" },
       });
-    } else {
+    } else if (
+      person.gender === "female" &&
+      !familyTreeStore.edges.some(
+        (e) => e.data.source === person.id && e.data.target === familyId
+      )
+    ) {
       familyTreeStore.edges.push({
         data: { source: person.id, target: familyId, label: "Wife" },
       });

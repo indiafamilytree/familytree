@@ -2,11 +2,12 @@
   <div class="app-container">
     <FamilyChart
       @node-selected="selectNode"
-      :selectedNodeId="selectedNodeData?.id"
+      :selected-node-id="selectedNodeData?.id"
       ref="familyChartRef"
       class="family-chart"
     />
     <SidePanel
+      v-if="showSidePanel"
       :selectedNodeData="selectedNodeData"
       @close="closeSidePanel"
       class="side-panel"
@@ -15,7 +16,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from "vue";
+import { ref, computed, onMounted } from "vue";
 import { useFamilyTreeStore } from "@/stores/family-tree-store/index";
 import FamilyChart from "@/components/FamilyChart.vue";
 import SidePanel from "@/components/SidePanel.vue";
@@ -25,12 +26,17 @@ const familyChartRef = ref(null);
 const store = useFamilyTreeStore();
 
 onMounted(() => {
-  if (store.persons.length === 0) {
-    store.initializeRootPerson({
-      name: "Kannaiyan",
-      gender: "male",
+  if (familyChartRef.value) {
+    familyChartRef.value.cy.on("unselect", "node", () => {
+      if (!selectedNodeData.value) {
+        closeSidePanel();
+      }
     });
   }
+});
+
+const showSidePanel = computed(() => {
+  return selectedNodeData.value !== null || store.persons.length === 0;
 });
 
 const selectNode = (nodeData) => {
@@ -39,7 +45,7 @@ const selectNode = (nodeData) => {
 
 const closeSidePanel = () => {
   selectedNodeData.value = null;
-  familyChartRef.value.unselectNode();
+  // No need to call unselectNode on familyChartRef
 };
 </script>
 
@@ -54,7 +60,7 @@ const closeSidePanel = () => {
 }
 
 .side-panel {
-  width: 400px; /* Adjust width as needed */
+  width: 300px; /* Adjust width as needed */
   overflow-y: auto;
 }
 </style>
