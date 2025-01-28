@@ -292,8 +292,40 @@ function saveChanges() {
       id === fam.wifeId
   );
 
+  // Update edges (Husband/Father, Wife/Mother)
+  updateEdgeLabels(fam);
+
   isEditing.value = false;
   loadFamily(props.familyData.id);
+}
+
+//Method to update edge labels
+function updateEdgeLabels(family) {
+  family.members.forEach((memberId) => {
+    const edge = store.edges.find(
+      (e) =>
+        (e.data.source === memberId && e.data.target === family.id) ||
+        (e.data.target === memberId && e.data.source === family.id)
+    );
+
+    if (edge) {
+      const person = store.persons.find((p) => p.id === memberId);
+
+      if (person) {
+        if (family.husbandId === person.id) {
+          edge.data.label =
+            localSons.value.length > 0 || localDaughters.value.length > 0
+              ? "Father"
+              : "Husband";
+        } else if (family.wifeId === person.id) {
+          edge.data.label =
+            localSons.value.length > 0 || localDaughters.value.length > 0
+              ? "Mother"
+              : "Wife";
+        }
+      }
+    }
+  });
 }
 
 function updateHusband(fam) {
