@@ -1,37 +1,32 @@
 <template>
   <div class="side-panel">
-    <div v-if="selectedPerson">
-      <h3 class="form-heading">Edit Person: {{ selectedPerson.name }}</h3>
-      <PersonNodeForm
-        :personData="selectedPerson"
-        @update:personData="updatePerson"
-        @close="closePanel"
-      />
+    <div class="main-content">
+      <div v-if="selectedPerson">
+        <h3 class="form-heading">Edit Person: {{ selectedPerson.name }}</h3>
+        <PersonNodeForm
+          :personData="selectedPerson"
+          @update:personData="updatePerson"
+          @close="closePanel"
+        />
+      </div>
+      <div v-else-if="selectedFamily">
+        <h3 class="form-heading">Edit Family: {{ selectedFamily.label }}</h3>
+        <FamilyNodeForm :familyData="selectedFamily" @close="closePanel" />
+      </div>
+      <div v-else-if="store.persons.length === 0">
+        <h3 class="form-heading">Add Person</h3>
+        <PersonForm />
+      </div>
+      <div v-else>
+        <h3 class="form-heading">Select a node</h3>
+      </div>
     </div>
-    <div v-else-if="selectedFamily">
-      <h3 class="form-heading">Edit Family: {{ selectedFamily.label }}</h3>
-      <FamilyNodeForm :familyData="selectedFamily" @close="closePanel" />
-    </div>
-    <div v-else-if="store.persons.length === 0">
-      <h3 class="form-heading">Add Person</h3>
-      <PersonForm />
-    </div>
-    <div v-else>
-      <h3 class="form-heading">Select a node</h3>
-    </div>
-    <!-- ▼ New section at bottom for export/import -->
-    <div class="export-import-actions">
+    <!-- Footer pinned at bottom -->
+    <div class="footer-actions">
       <button @click="downloadTree">Download Tree</button>
-
-      <!-- A label wrapping a hidden file-input for import -->
       <label class="import-button">
         Import Tree
-        <input
-          type="file"
-          @change="handleTreeImport"
-          accept=".json"
-          style="display: none"
-        />
+        <input type="file" @change="handleTreeImport" style="display: none" />
       </label>
     </div>
   </div>
@@ -156,35 +151,38 @@ function closePanel() {
 
 <style scoped>
 .side-panel {
-  width: 350px; /* Adjust width as needed, was 300 */
+  /* Make sure it spans the full viewport height (or parent) */
   height: 100vh;
-  overflow-y: auto;
-  border-left: 1px solid #ccc;
-  padding: 1rem;
-  background-color: #f8f8f8;
-}
-
-.form-heading {
-  margin-top: 0; /* Remove default top margin */
-  margin-bottom: 1rem;
-}
-
-.export-import-actions {
-  margin-top: 1rem;
   display: flex;
-  flex-direction: row;
-  gap: 10px;
-  justify-content: flex-end;
+  flex-direction: column;
+  border-left: 1px solid #ccc;
+  width: 350px; /* or whatever you prefer */
 }
 
+/* This will expand to fill remaining vertical space,
+   letting the footer “push” to the bottom. */
+.main-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1rem;
+}
+
+/* Footer pinned at bottom because of the flex layout */
+.footer-actions {
+  display: flex;
+  gap: 1rem;
+  border-top: 1px solid #ccc;
+  padding: 0.75rem 1rem;
+  justify-content: flex-end; /* Right-align buttons */
+}
+
+/* Example styling for the import label as a button */
 .import-button {
-  /* Make the label look like a button */
   background-color: #007bff;
   color: #fff;
   padding: 0.5rem 0.8rem;
   border-radius: 4px;
   cursor: pointer;
-  user-select: none; /* Prevent text selection when clicking label */
 }
 .import-button:hover {
   background-color: #005fc7;
