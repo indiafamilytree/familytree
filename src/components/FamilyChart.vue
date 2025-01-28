@@ -92,7 +92,22 @@ const edgeColorMap = new Map();
 
 const layoutConfig = {
   name: "dagre",
-  rankDir: "TB", // or "LR" for left-to-right
+  rankDir: "TB", // or 'TB' for top-to-bottom
+  // For each edge, set how many “ranks” to keep between source and target
+  minLen: function (edge) {
+    const label = edge.data("label");
+    // Father->Family or Mother->Family => minLen=0
+    if (
+      label === "Husband" ||
+      label === "Wife" ||
+      label === "Father" ||
+      label === "Mother"
+    ) {
+      return 0;
+    }
+    // Children => rank distance 1 (or your default)
+    return 1;
+  },
   spacingFactor: 1.2,
   nodeSep: 50,
   edgeSep: 10,
@@ -138,6 +153,16 @@ const styleConfig = [
       },
       "text-wrap": "wrap",
       "text-max-width": "110px",
+    },
+  },
+  {
+    selector: "node[isFamily]",
+    style: {
+      label: "", // Hide the label
+      shape: "ellipse", // Circle shape
+      "background-color": "#DDA0DD", // Your purple
+      width: "20px", // Make it small
+      height: "20px",
     },
   },
   {
