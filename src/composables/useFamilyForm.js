@@ -47,11 +47,11 @@ export function useFamilyForm() {
   function createImmediateFamily(person) {
     if (!person) return;
 
-    // Create a new family node
+    // (1) Create the family node & push to store
     let familyId = `family-${familyTreeStore.families.length + 1}`;
     familyTreeStore.families.push({
       id: familyId,
-      members: [person.id], // Initially, the family only contains the person
+      members: [person.id],
       husbandId: null,
       wifeId: null,
       sons: [],
@@ -61,18 +61,26 @@ export function useFamilyForm() {
       data: { id: familyId, label: "Family", isFamily: true },
     });
 
-    // Add the person to the family members if not already present
-    const family = familyTreeStore.families.find((f) => f.id === familyId);
-    if (!family.members.includes(person.id)) {
-      family.members.push(person.id);
+    const alreadyLinked = familyTreeStore.edges.some(
+      (e) => e.data.source === person.id && e.data.target === familyId
+    );
+
+    if (!alreadyLinked) {
+      // If he’s male, label the edge "Husband" (or "Father" once kids exist)
+      // If she’s female, label "Wife"/"Mother"
+      const label = person.gender === "male" ? "Husband" : "Wife";
+      familyTreeStore.edges.push({
+        data: { source: person.id, target: familyId, label },
+      });
     }
 
-    // Add the spouse if provided
+    // (2) If spouseName is given, add spouse with label “Husband” or “Wife”
     let spouseId = null;
     if (spouseName.value) {
       spouseId = `person-${familyTreeStore.persons.length + 1}`;
       const spouseGender = person.gender === "male" ? "female" : "male";
       const spouseRelation = person.gender === "male" ? "Wife" : "Husband";
+
       familyTreeStore.persons.push({
         id: spouseId,
         name: spouseName.value,
@@ -81,13 +89,13 @@ export function useFamilyForm() {
       familyTreeStore.nodes.push({
         data: { id: spouseId, label: spouseName.value, gender: spouseGender },
       });
-      // Add edge for the spouse
       familyTreeStore.edges.push({
         data: { source: spouseId, target: familyId, label: spouseRelation },
       });
     }
 
-    // Update family members based on gender
+    // (3) Update husband/wife IDs
+    const family = familyTreeStore.families.find((f) => f.id === familyId);
     if (person.gender === "male") {
       family.husbandId = person.id;
       if (spouseId) family.wifeId = spouseId;
@@ -96,25 +104,7 @@ export function useFamilyForm() {
       if (spouseId) family.husbandId = spouseId;
     }
 
-    // Add spouse to family members if new
-    if (spouseId && !family.members.includes(spouseId)) {
-      family.members.push(spouseId);
-    }
-
-    // Add or update the family node label
-    const familyNode = familyTreeStore.nodes.find(
-      (n) => n.data.id === familyId
-    );
-    if (familyNode) {
-      const husband = familyTreeStore.persons.find(
-        (p) => p.id === family.husbandId
-      );
-      const wife = familyTreeStore.persons.find((p) => p.id === family.wifeId);
-      familyNode.data.label =
-        (husband ? husband.name : "") + (wife ? `\n${wife.name}` : "");
-    }
-
-    // Add new sons and daughters with the correct family ID
+    // (4) Add new sons and daughters
     newSons.value.forEach((son) => {
       familyTreeStore.addPerson({
         ...son,
@@ -130,25 +120,30 @@ export function useFamilyForm() {
       });
     });
 
-    // Add edge for the person to the family, only if not already added
-    if (
-      person.gender === "male" &&
-      !familyTreeStore.edges.some(
-        (e) => e.data.source === person.id && e.data.target === familyId
-      )
-    ) {
-      familyTreeStore.edges.push({
-        data: { source: person.id, target: familyId, label: "Husband" },
-      });
-    } else if (
-      person.gender === "female" &&
-      !familyTreeStore.edges.some(
-        (e) => e.data.source === person.id && e.data.target === familyId
-      )
-    ) {
-      familyTreeStore.edges.push({
-        data: { source: person.id, target: familyId, label: "Wife" },
-      });
+    // (5) If we actually have children, rename Husband → Father / Wife → Mother
+    if (newSons.value.length > 0 || newDaughters.value.length > 0) {
+      if (family.husbandId) {
+        const husbandEdge = familyTreeStore.edges.find(
+          (e) =>
+            e.data.source === family.husbandId &&
+            e.data.target === familyId &&
+            e.data.label === "Husband"
+        );
+        if (husbandEdge) {
+          husbandEdge.data.label = "Father";
+        }
+      }
+      if (family.wifeId) {
+        const wifeEdge = familyTreeStore.edges.find(
+          (e) =>
+            e.data.source === family.wifeId &&
+            e.data.target === familyId &&
+            e.data.label === "Wife"
+        );
+        if (wifeEdge) {
+          wifeEdge.data.label = "Mother";
+        }
+      }
     }
   }
 
