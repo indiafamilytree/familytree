@@ -12,12 +12,12 @@
 
 <script setup>
 import cytoscape from "cytoscape";
-import fcose from "cytoscape-fcose";
+import dagre from "cytoscape-dagre";
 import { onMounted, ref, watch, onUnmounted } from "vue";
 import { useFamilyTreeStore } from "@/stores/family-tree-store/index";
 
 // Register the fcose layout
-cytoscape.use(fcose);
+cytoscape.use(dagre);
 
 const familyTreeStore = useFamilyTreeStore();
 const cy = ref(null);
@@ -27,7 +27,7 @@ const emit = defineEmits(["node-selected"]);
 onMounted(() => {
   if (familyTreeStore.persons.length === 0) {
     familyTreeStore.initializeRootPerson({
-      name: "Kannaiyan",
+      name: "Kannusamy",
       gender: "male",
     });
   }
@@ -91,21 +91,14 @@ let colorIndex = 0;
 const edgeColorMap = new Map();
 
 const layoutConfig = {
-  name: "fcose",
-  animate: true,
-  fit: true,
-  padding: 30,
+  name: "dagre",
+  rankDir: "TB", // or "LR" for left-to-right
   spacingFactor: 1.2,
-  nodeRepulsion: 4500,
-  idealEdgeLength: 50, // Adjusted for better layout
-  edgeElasticity: 0.45,
-  nestingFactor: 0.1,
-  gravity: 0.25,
-  numIter: 2500,
-  tile: true,
-  tilingPaddingVertical: 20, // Adjusted for better layout
-  tilingPaddingHorizontal: 20, // Adjusted for better layout
-  packComponents: true,
+  nodeSep: 50,
+  edgeSep: 10,
+  rankSep: 100,
+  // optional: define which nodes are “highest”
+  // e.g. by setting minLen or rank in dagre.
 };
 
 const styleConfig = [
