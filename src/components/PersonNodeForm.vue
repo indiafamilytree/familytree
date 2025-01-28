@@ -1,83 +1,69 @@
 <template>
   <div class="person-node-form">
-    <div
-      v-if="!showImmediateFamilyForm && !showAncestralFamilyForm"
-      class="button-group"
-    >
-      <button @click="showImmediateFamilyForm = true" class="form-button">
+    <div v-if="!showImmediateFamilyForm && !showAncestralFamilyForm">
+      <button @click="showImmediateFamilyForm = true">
         Create Immediate Family
       </button>
-      <button @click="showAncestralFamilyForm = true" class="form-button">
+      <button @click="showAncestralFamilyForm = true">
         Add Parents (Ancestral Family)
       </button>
     </div>
 
-    <div v-if="showImmediateFamilyForm" class="form-section">
-      <h4 class="section-title">Add Immediate Family</h4>
-      <div class="form-group">
-        <label class="form-label">Spouse Name:</label>
-        <input type="text" v-model="spouseName" class="form-input" />
+    <div v-if="showImmediateFamilyForm">
+      <h4>Add Immediate Family</h4>
+      <div>
+        <label>Spouse Name:</label>
+        <input type="text" v-model="spouseName" />
       </div>
 
-      <div class="form-group">
-        <label class="form-label">New Son:</label>
-        <div class="input-group">
-          <input v-model="tempSonName" type="text" class="form-input" />
-          <button @click="addSonLocally" class="form-button">+</button>
+      <div>
+        <label>New Son:</label>
+        <div>
+          <input v-model="tempSonName" type="text" />
+          <button @click="addSonLocally">+</button>
         </div>
-        <ul class="list">
-          <li v-for="(son, i) in newSons" :key="i" class="list-item">
+        <ul>
+          <li v-for="(son, i) in newSons" :key="i">
             <span>{{ son.name }}</span>
-            <button @click="removeSonLocally(i)" class="form-button-remove">
-              Remove
-            </button>
+            <button @click="removeSonLocally(i)">Remove</button>
           </li>
         </ul>
       </div>
 
-      <div class="form-group">
-        <label class="form-label">New Daughter:</label>
-        <div class="input-group">
-          <input v-model="tempDaughterName" type="text" class="form-input" />
-          <button @click="addDaughterLocally" class="form-button">+</button>
+      <div>
+        <label>New Daughter:</label>
+        <div>
+          <input v-model="tempDaughterName" type="text" />
+          <button @click="addDaughterLocally">+</button>
         </div>
-        <ul class="list">
-          <li v-for="(daughter, i) in newDaughters" :key="i" class="list-item">
+        <ul>
+          <li v-for="(daughter, i) in newDaughters" :key="i">
             <span>{{ daughter.name }}</span>
-            <button
-              @click="removeDaughterLocally(i)"
-              class="form-button-remove"
-            >
-              Remove
-            </button>
+            <button @click="removeDaughterLocally(i)">Remove</button>
           </li>
         </ul>
       </div>
 
-      <div class="button-group">
-        <button @click="confirmImmediateFamily" class="form-button">
-          Create Immediate Family
-        </button>
-        <button @click="cancel" class="form-button-cancel">Cancel</button>
+      <div>
+        <button @click="confirmImmediateFamily">Create Immediate Family</button>
+        <button @click="cancel">Cancel</button>
       </div>
     </div>
 
-    <div v-if="showAncestralFamilyForm" class="form-section">
-      <h4 class="section-title">Add Ancestral Family</h4>
-      <div class="form-group">
-        <label class="form-label">Father Name:</label>
-        <input type="text" v-model="fatherName" class="form-input" />
+    <div v-if="showAncestralFamilyForm">
+      <h4>Add Ancestral Family</h4>
+      <div>
+        <label>Father Name:</label>
+        <input type="text" v-model="fatherName" />
       </div>
-      <div class="form-group">
-        <label class="form-label">Mother Name:</label>
-        <input type="text" v-model="motherName" class="form-input" />
+      <div>
+        <label>Mother Name:</label>
+        <input type="text" v-model="motherName" />
       </div>
 
-      <div class="button-group">
-        <button @click="confirmAncestralFamily" class="form-button">
-          Create Ancestral Family
-        </button>
-        <button @click="cancel" class="form-button-cancel">Cancel</button>
+      <div>
+        <button @click="confirmAncestralFamily">Create Ancestral Family</button>
+        <button @click="cancel">Cancel</button>
       </div>
     </div>
   </div>
@@ -139,87 +125,30 @@ function cancel() {
 <style scoped>
 .person-node-form {
   padding: 20px;
-  border: 1px solid #ccc;
-  border-radius: 5px;
-  background-color: #f8f8f8;
+  background-color: #f0f0f0; /* Or any background you like */
+  border-radius: 8px;
 }
 
-.form-section {
-  margin-bottom: 20px;
-}
-
-.section-title {
-  margin-top: 0;
-  margin-bottom: 10px;
-  font-size: 1.1rem;
-  font-weight: 600;
-}
-
-.form-group {
-  margin-bottom: 15px;
-}
-
-.form-label {
-  display: block;
-  margin-bottom: 5px;
-  font-weight: 500;
-}
-
-.form-input {
-  width: 100%;
+/* Example: basic input and button styling */
+input[type="text"],
+button,
+select {
   padding: 8px;
+  margin-bottom: 10px;
   border: 1px solid #ccc;
   border-radius: 4px;
-  box-sizing: border-box;
-  font-size: 1rem;
 }
-
-.input-group {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-}
-
-.button-group {
-  display: flex;
-  gap: 10px;
-}
-
-.form-button,
-.form-button-remove,
-.form-button-cancel {
-  padding: 8px 15px;
+button {
+  background-color: #007bff;
+  color: white;
   border: none;
-  border-radius: 4px;
-  font-size: 1rem;
   cursor: pointer;
 }
 
-.form-button {
-  background-color: #4285f4;
-  color: white;
+ul {
+  list-style-type: none;
+  padding-left: 0; /* Reset any default padding */
 }
 
-.form-button-remove {
-  background-color: #dc3545;
-  color: white;
-}
-
-.form-button-cancel {
-  background-color: #6c757d;
-  color: white;
-}
-
-.list {
-  margin-top: 10px;
-  list-style: none;
-  padding: 0;
-}
-
-.list-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 8px;
-}
+/* Other styles as needed... */
 </style>

@@ -1,11 +1,7 @@
 <template>
-  <div
-    class="side-panel w-full h-full overflow-y-auto border-l border-gray-200 p-4 bg-gray-100"
-  >
+  <div class="side-panel">
     <div v-if="selectedPerson">
-      <h3 class="text-lg font-bold mb-4">
-        Edit Person: {{ selectedPerson.name }}
-      </h3>
+      <h3 class="form-heading">Edit Person: {{ selectedPerson.name }}</h3>
       <PersonNodeForm
         :personData="selectedPerson"
         @update:personData="updatePerson"
@@ -13,17 +9,15 @@
       />
     </div>
     <div v-else-if="selectedFamily">
-      <h3 class="text-lg font-bold mb-4">
-        Edit Family: {{ selectedFamily.label }}
-      </h3>
+      <h3 class="form-heading">Edit Family: {{ selectedFamily.label }}</h3>
       <FamilyNodeForm :familyData="selectedFamily" @close="closePanel" />
     </div>
     <div v-else-if="store.persons.length === 0">
-      <h3 class="text-lg font-bold mb-4">Add Person</h3>
+      <h3 class="form-heading">Add Person</h3>
       <PersonForm />
     </div>
     <div v-else>
-      <h3 class="text-lg font-bold mb-4">Select a node</h3>
+      <h3 class="form-heading">Select a node</h3>
     </div>
   </div>
 </template>

@@ -1,3 +1,149 @@
+<template>
+  <div class="form-container">
+    <h3 class="form-title">Family Details</h3>
+    <div v-if="familyData" class="form-body">
+      <div class="form-group">
+        <label class="form-label">Husband:</label>
+        <div class="input-button-group">
+          <input
+            v-model="localHusbandName"
+            :disabled="!isEditing"
+            class="form-input"
+          />
+          <button
+            v-if="isEditing"
+            @click="saveHusband"
+            class="form-button save-button"
+          >
+            Save
+          </button>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Wife:</label>
+        <div class="input-button-group">
+          <input
+            v-model="localWifeName"
+            :disabled="!isEditing"
+            class="form-input"
+          />
+          <button
+            v-if="isEditing"
+            @click="saveWife"
+            class="form-button save-button"
+          >
+            Save
+          </button>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Sons:</label>
+        <ul class="list">
+          <li v-for="son in localSons" :key="son.id" class="list-item">
+            <input
+              v-if="isEditing"
+              v-model="son.name"
+              class="form-input list-input"
+            />
+            <span v-else class="list-text">{{ son.name }}</span>
+            <div class="button-group">
+              <button
+                v-if="isEditing"
+                @click="saveSon(son)"
+                class="form-button save-button"
+              >
+                Save
+              </button>
+              <button
+                @click="removeSon(son.id)"
+                class="form-button remove-button"
+              >
+                Remove
+              </button>
+            </div>
+          </li>
+        </ul>
+        <div v-if="isEditing" class="add-input-group">
+          <input
+            type="text"
+            v-model="tempSonName"
+            placeholder="New Son"
+            class="form-input"
+          />
+          <button @click="addNewSon" class="form-button add-button">Add</button>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Daughters:</label>
+        <ul class="list">
+          <li
+            v-for="daughter in localDaughters"
+            :key="daughter.id"
+            class="list-item"
+          >
+            <input
+              v-if="isEditing"
+              v-model="daughter.name"
+              class="form-input list-input"
+            />
+            <span v-else class="list-text">{{ daughter.name }}</span>
+            <div class="button-group">
+              <button
+                v-if="isEditing"
+                @click="removeDaughter(daughter.id)"
+                class="form-button remove-button"
+              >
+                Remove
+              </button>
+            </div>
+          </li>
+        </ul>
+        <div v-if="isEditing" class="add-input-group">
+          <input
+            type="text"
+            v-model="tempDaughterName"
+            placeholder="New Daughter"
+            class="form-input"
+          />
+          <button @click="addNewDaughter" class="form-button add-button">
+            Add
+          </button>
+        </div>
+      </div>
+
+      <div class="form-actions">
+        <button
+          v-if="!isEditing"
+          @click="isEditing = true"
+          class="form-button edit-button"
+        >
+          Edit
+        </button>
+        <button
+          v-if="isEditing"
+          @click="saveChanges"
+          class="form-button save-button"
+        >
+          Save
+        </button>
+        <button
+          v-if="isEditing"
+          @click="cancelEdit"
+          class="form-button cancel-button"
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+    <div v-else>
+      <p>No family selected.</p>
+    </div>
+  </div>
+</template>
+
 <script setup>
 import { ref, watch, defineProps, defineEmits } from "vue";
 import { useFamilyTreeStore } from "@/stores/family-tree-store/index";
@@ -33,7 +179,6 @@ watch(
 function loadFamily(familyId) {
   const fam = store.families.find((f) => f.id === familyId);
   if (!fam) return;
-  console.log("Loading family data for:", fam);
 
   // Load husband data
   localHusbandName.value = fam.husbandId
@@ -56,9 +201,8 @@ function loadFamily(familyId) {
     .map((id) => ({
       ...store.persons.find((p) => p.id === id),
     }));
-  console.log("Local sons loaded:", localSons.value);
 
-  // Load daughters, excluding husband and wife
+  // Load daughters, excluding husband and wife and filter by gender
   localDaughters.value = fam.members
     .filter(
       (id) =>
@@ -69,7 +213,6 @@ function loadFamily(familyId) {
     .map((id) => ({
       ...store.persons.find((p) => p.id === id),
     }));
-  console.log("Local daughters loaded:", localDaughters.value);
 }
 
 function addNewSon() {
@@ -189,7 +332,7 @@ function updateWife(fam) {
   } else if (fam.wifeId) {
     // Remove wife if name is cleared
     fam.members = fam.members.filter((id) => id !== fam.wifeId);
-    fam.wifefam.wifeId = null;
+    fam.wifeId = null;
   }
 }
 
