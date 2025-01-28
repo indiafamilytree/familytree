@@ -1,18 +1,12 @@
 <template>
-  <div>
-    <div
-      id="cy"
-      style="width: 100%; height: 100vh; background-color: #f9f9f9"
-    ></div>
-    <button @click="exportAsHighResPNG">Export as PNG (300 DPI)</button>
-
-    <FamilyNodePopup
-      v-if="showPopup"
-      :familyData="selectedNodeData"
-      :popupX="popupX"
-      :popupY="popupY"
-      @close="closePopup"
-    />
+  <div class="relative w-full h-screen">
+    <div id="cy" class="absolute top-0 left-0 w-full h-full bg-gray-100"></div>
+    <button
+      @click="exportAsHighResPNG"
+      class="absolute top-4 right-4 px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+    >
+      Export as PNG (300 DPI)
+    </button>
   </div>
 </template>
 
@@ -21,27 +15,23 @@ import cytoscape from "cytoscape";
 import fcose from "cytoscape-fcose";
 import { onMounted, ref, watch, onUnmounted } from "vue";
 import { useFamilyTreeStore } from "@/stores/family-tree-store/index";
-import FamilyNodePopup from "@/components/FamilyNodePopup.vue"; // Import the new component
 
 // Register the fcose layout
 cytoscape.use(fcose);
 
 const familyTreeStore = useFamilyTreeStore();
 const cy = ref(null);
+const emit = defineEmits(["node-selected"]);
 
 // Initialize root person if not already initialized
-if (!familyTreeStore.rootPerson) {
-  familyTreeStore.initializeRootPerson({
-    name: "Kannaiyan",
-    gender: "male",
-  });
-}
-
-// Popup state
-const showPopup = ref(false);
-const popupX = ref("0"); // Initialize as strings
-const popupY = ref("0"); // Initialize as strings
-const selectedNodeData = ref(null); // To store data of the selected node
+onMounted(() => {
+  if (familyTreeStore.persons.length === 0) {
+    familyTreeStore.initializeRootPerson({
+      name: "Kannaiyan",
+      gender: "male",
+    });
+  }
+});
 
 // --- Color Palette (50 colors) ---
 const colorPalette = [
@@ -187,23 +177,6 @@ const styleConfig = [
   },
 ];
 
-// Define handleWindowClick *outside* of initializeChart and *before* onMounted
-const handleWindowClick = (event) => {
-  console.log("Window clicked");
-  if (showPopup.value) {
-    const popupElement = document.querySelector(".popup");
-    const cyContainer = document.querySelector("#cy");
-    if (
-      popupElement &&
-      !popupElement.contains(event.target) &&
-      cyContainer &&
-      !cyContainer.contains(event.target)
-    ) {
-      closePopup();
-    }
-  }
-};
-
 const initializeChart = () => {
   cy.value = cytoscape({
     container: document.getElementById("cy"),
@@ -238,54 +211,10 @@ const initializeChart = () => {
     centerOnRoot();
   });
 
-  // --- Click to Show Popup ---
-  const showPersonDetails = (node) => {
-    console.log("showPersonDetails called", node.data());
-    selectedNodeData.value = node.data().isFamily ? node.data() : null;
-
-    // Get the rendered position of the node
-    const renderedPosition = node.renderedPosition();
-
-    // Get the container of Cytoscape
-    const container = cy.value.container();
-
-    // Calculate the position of the popup
-    popupX.value = renderedPosition.x + container.offsetLeft + "px"; // Add "px" to make it a string
-    popupY.value = renderedPosition.y + container.offsetTop + "px"; // Add "px" to make it a string
-
-    showPopup.value = true;
-    console.log("showPopup set to true");
-  };
-
-  let clickTimeout = null;
-
+  // --- Click to Show Details in Sidebar ---
   cy.value.on("tap", "node", (event) => {
     const node = event.target;
-    if (node.data("isFamily")) {
-      // Directly show the popup for family nodes
-      console.log("Family node clicked");
-      showPersonDetails(node);
-    } else {
-      // Existing logic for non-family nodes
-      if (!clickTimeout) {
-        clickTimeout = setTimeout(() => {
-          showPersonDetails(event.target);
-          clickTimeout = null;
-        }, 300);
-      } else {
-        clearTimeout(clickTimeout);
-        clickTimeout = null;
-        const node = event.target;
-        const newName = prompt("Edit Name:", node.data("label"));
-        if (newName) {
-          node.data("label", newName);
-          const storeNode = familyTreeStore.nodes.find(
-            (n) => n.data.id === node.data("id")
-          );
-          if (storeNode) storeNode.data.label = newName;
-        }
-      }
-    }
+    emit("node-selected", node.data());
   });
 
   // Enable editing on right-click
@@ -335,14 +264,8 @@ watch(
   { deep: true }
 );
 
-// Call initializeChart in onMounted *after* handleWindowClick is defined
 onMounted(() => {
   initializeChart();
-  window.addEventListener("click", handleWindowClick);
-});
-
-onUnmounted(() => {
-  window.removeEventListener("click", handleWindowClick);
 });
 
 function exportAsHighResPNG() {
@@ -379,22 +302,42 @@ function exportAsHighResPNG() {
   URL.revokeObjectURL(url);
 }
 
-const closePopup = () => {
-  showPopup.value = false;
-  selectedNodeData.value = null;
-  console.log("closePopup called");
-};
-
 // Function to log nodes and edges
 const logNodesAndEdges = () => {
   console.log("Current Nodes:", cy.value.nodes().jsons());
   console.log("Current Edges:", cy.value.edges().jsons());
 };
 </script>
-
 <style scoped>
-#cy {
+.relative {
+  position: relative;
   width: 100%;
   height: 100vh;
+}
+.family-chart-container {
+  position: relative;
+  width: 100%;
+  height: 100vh;
+}
+
+#cy {
+  width: 100%;
+  height: 100%;
+  background-color: #f9f9f9;
+}
+
+.export-button {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  padding: 8px 12px;
+  border: 1px solid transparent;
+  font-size: 14px;
+  font-weight: 500;
+  border-radius: 5px;
+  color: white;
+  background-color: #4285f4;
+  cursor: pointer;
+  z-index: 10; /* Ensure button is above the chart */
 }
 </style>

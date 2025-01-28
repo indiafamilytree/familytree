@@ -1,3 +1,4 @@
+// ./stores/family-tree-store/actions/initializeRootPerson.js
 export function initializeRootPerson(rootPerson, enableLogging = false) {
   const isDevelopment = enableLogging;
 
@@ -17,22 +18,25 @@ export function initializeRootPerson(rootPerson, enableLogging = false) {
   const familyId = "family-1";
   this.families.push({
     id: familyId,
-    members: [rootId], // Root person is a member of this family
+    members: [rootId],
+    // Initialize sons and daughters as empty arrays
+    sons: [],
+    daughters: [],
   });
 
   this.nodes.push({
     data: {
       id: familyId,
-      label: "Family", // Family node label
+      label: "Family",
       isFamily: true,
     },
   });
 
-  // Create an edge from the family to the root person, labeling them as Son/Daughter
+  // Create an edge from the family to the root person
   this.edges.push({
     data: {
-      source: familyId, // Family is the source
-      target: rootId, // Root person is the target
+      source: familyId,
+      target: rootId,
       label: rootPerson.gender === "male" ? "Son" : "Daughter",
     },
   });
