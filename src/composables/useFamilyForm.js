@@ -44,55 +44,134 @@ export function useFamilyForm() {
   }
 
   // Create an immediate family from a single "person"
-  // If the person is male => that person is "husband"; female => "wife".
-  // If spouseName is provided, we create the spouse as well.
-  // Then we add any newSons/newDaughters to that family.
   function createImmediateFamily(person) {
     if (!person) return;
 
-    let husbandId = null;
-    let wifeId = null;
-
-    if (person.gender === "male") {
-      husbandId = person.id;
-      if (spouseName.value) {
-        const newWifeId = `person-${familyTreeStore.persons.length + 1}`;
-        familyTreeStore.persons.push({
-          id: newWifeId,
-          name: spouseName.value,
-          gender: "female",
-        });
-        familyTreeStore.nodes.push({
-          data: { id: newWifeId, label: spouseName.value, gender: "female" },
-        });
-        wifeId = newWifeId;
-      }
+    // Determine the existing family ID or create a new one
+    let existingFamily = familyTreeStore.families.find((f) =>
+      f.members.includes(person.id)
+    );
+    let familyId;
+    if (existingFamily) {
+      familyId = existingFamily.id;
     } else {
-      wifeId = person.id;
-      if (spouseName.value) {
-        const newHusbandId = `person-${familyTreeStore.persons.length + 1}`;
-        familyTreeStore.persons.push({
-          id: newHusbandId,
-          name: spouseName.value,
-          gender: "male",
-        });
-        familyTreeStore.nodes.push({
-          data: { id: newHusbandId, label: spouseName.value, gender: "male" },
-        });
-        husbandId = newHusbandId;
-      }
+      familyId = `family-${familyTreeStore.families.length + 1}`;
+      familyTreeStore.families.push({
+        id: familyId,
+        members: [person.id],
+        husbandId: null,
+        wifeId: null,
+        sons: [],
+        daughters: [],
+      });
+      familyTreeStore.nodes.push({
+        data: { id: familyId, label: "Family", isFamily: true },
+      });
     }
 
-    // Create a new family
-    const newFamily = familyTreeStore.createFamily(husbandId, wifeId);
+    // Add the person to the family members if not already present
+    if (
+      !familyTreeStore.families
+        .find((f) => f.id === familyId)
+        .members.includes(person.id)
+    ) {
+      familyTreeStore.families
+        .find((f) => f.id === familyId)
+        .members.push(person.id);
+    }
 
-    // Add ephemeral kids
+    // Add the spouse if provided
+    let spouseId = null;
+    if (spouseName.value) {
+      spouseId = `person-${familyTreeStore.persons.length + 1}`;
+      const spouseGender = person.gender === "male" ? "female" : "male";
+      const spouseRelation = person.gender === "male" ? "Wife" : "Husband";
+      familyTreeStore.persons.push({
+        id: spouseId,
+        name: spouseName.value,
+        gender: spouseGender,
+      });
+      familyTreeStore.nodes.push({
+        data: { id: spouseId, label: spouseName.value, gender: spouseGender },
+      });
+      // Add edge for the spouse
+      familyTreeStore.edges.push({
+        data: { source: spouseId, target: familyId, label: spouseRelation },
+      });
+    }
+
+    // Update family members based on gender
+    if (person.gender === "male") {
+      familyTreeStore.families.find((f) => f.id === familyId).husbandId =
+        person.id;
+      if (spouseId)
+        familyTreeStore.families.find((f) => f.id === familyId).wifeId =
+          spouseId;
+    } else {
+      familyTreeStore.families.find((f) => f.id === familyId).wifeId =
+        person.id;
+      if (spouseId)
+        familyTreeStore.families.find((f) => f.id === familyId).husbandId =
+          spouseId;
+    }
+
+    // Add spouse to family members if new
+    if (
+      spouseId &&
+      !familyTreeStore.families
+        .find((f) => f.id === familyId)
+        .members.includes(spouseId)
+    ) {
+      familyTreeStore.families
+        .find((f) => f.id === familyId)
+        .members.push(spouseId);
+    }
+
+    // Add or update the family node label
+    const familyNode = familyTreeStore.nodes.find(
+      (n) => n.data.id === familyId
+    );
+    if (familyNode) {
+      const husband = familyTreeStore.persons.find(
+        (p) =>
+          p.id ===
+          familyTreeStore.families.find((f) => f.id === familyId).husbandId
+      );
+      const wife = familyTreeStore.persons.find(
+        (p) =>
+          p.id ===
+          familyTreeStore.families.find((f) => f.id === familyId).wifeId
+      );
+      familyNode.data.label =
+        (husband ? husband.name : "") + (wife ? `\n${wife.name}` : "");
+    }
+
+    // Add new sons and daughters
     newSons.value.forEach((son) => {
-      familyTreeStore.addSon(newFamily.id, son.name);
+      familyTreeStore.addPerson({
+        ...son,
+        relation: "Son",
+        linkedFamilyId: familyId,
+      });
     });
     newDaughters.value.forEach((daughter) => {
-      familyTreeStore.addDaughter(newFamily.id, daughter.name);
+      familyTreeStore.addPerson({
+        ...daughter,
+        relation: "Daughter",
+        linkedFamilyId: familyId,
+      });
     });
+
+    // Add edge for the person to the family
+    if (person.gender === "male") {
+      familyTreeStore.edges.push({
+        data: { source: person.id, target: familyId, label: "Husband" },
+      });
+    } else {
+      familyTreeStore.edges.push({
+        data: { source: person.id, target: familyId, label: "Wife" },
+      });
+    }
   }
 
   // Create an ancestral family for a single "person" => father & mother
@@ -127,32 +206,79 @@ export function useFamilyForm() {
       });
     }
 
-    // Create a family with fatherId=husbandId, motherId=wifeId
-    const newFamily = familyTreeStore.createFamily(fatherId, motherId);
+    // Create a new family
+    const newFamilyId = `family-${familyTreeStore.families.length + 1}`;
+    familyTreeStore.families.push({
+      id: newFamilyId,
+      members: [],
+      husbandId: fatherId,
+      wifeId: motherId,
+      sons: [],
+      daughters: [],
+    });
+    familyTreeStore.nodes.push({
+      data: { id: newFamilyId, label: "Family", isFamily: true },
+    });
+
+    // Add father and mother to the family members
+    if (fatherId)
+      familyTreeStore.families
+        .find((f) => f.id === newFamilyId)
+        .members.push(fatherId);
+    if (motherId)
+      familyTreeStore.families
+        .find((f) => f.id === newFamilyId)
+        .members.push(motherId);
+
+    // Add the person to the family members
+    if (
+      !familyTreeStore.families
+        .find((f) => f.id === newFamilyId)
+        .members.includes(person.id)
+    ) {
+      familyTreeStore.families
+        .find((f) => f.id === newFamilyId)
+        .members.push(person.id);
+    }
 
     // Link the person as "Son" or "Daughter" from that family
-    if (person.gender === "male") {
-      // store-level approach: we can just call addSon, but we want the same "person" object
-      // We'll do a direct push
-      newFamily.sons.push(person.id);
+    const relation = person.gender === "male" ? "Son" : "Daughter";
+    familyTreeStore.edges.push({
+      data: {
+        source: newFamilyId,
+        target: person.id,
+        label: relation,
+      },
+    });
+
+    // Add edges for father and mother if they exist
+    if (fatherId) {
       familyTreeStore.edges.push({
         data: {
-          source: newFamily.id,
-          target: person.id,
-          label: "Son",
+          source: fatherId,
+          target: newFamilyId,
+          label: "Father",
         },
       });
-      familyTreeStore.updateSpouseEdges(newFamily);
-    } else {
-      newFamily.daughters.push(person.id);
+    }
+    if (motherId) {
       familyTreeStore.edges.push({
         data: {
-          source: newFamily.id,
-          target: person.id,
-          label: "Daughter",
+          source: motherId,
+          target: newFamilyId,
+          label: "Mother",
         },
       });
-      familyTreeStore.updateSpouseEdges(newFamily);
+    }
+
+    // Update family node label
+    const familyNode = familyTreeStore.nodes.find(
+      (n) => n.data.id === newFamilyId
+    );
+    if (familyNode) {
+      familyNode.data.label =
+        (fatherName.value ? fatherName.value : "") +
+        (motherName.value ? `\n${motherName.value}` : "");
     }
   }
 

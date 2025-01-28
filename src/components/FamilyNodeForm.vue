@@ -50,13 +50,6 @@
             <span v-else class="list-text">{{ son.name }}</span>
             <div class="button-group">
               <button
-                v-if="isEditing"
-                @click="saveSon(son)"
-                class="form-button save-button"
-              >
-                Save
-              </button>
-              <button
                 @click="removeSon(son.id)"
                 class="form-button remove-button"
               >
@@ -91,13 +84,6 @@
             />
             <span v-else class="list-text">{{ daughter.name }}</span>
             <div class="button-group">
-              <button
-                v-if="isEditing"
-                @click="saveDaughter(daughter)"
-                class="form-button save-button"
-              >
-                Save
-              </button>
               <button
                 @click="removeDaughter(daughter.id)"
                 class="form-button remove-button"
@@ -196,7 +182,7 @@ function loadFamily(familyId) {
     ? store.persons.find((p) => p.id === fam.wifeId)?.name || ""
     : "";
 
-  // Load sons, excluding husband
+  // Load sons, excluding husband and wife
   localSons.value = fam.members
     .filter(
       (id) =>
@@ -208,7 +194,7 @@ function loadFamily(familyId) {
       ...store.persons.find((p) => p.id === id),
     }));
 
-  // Load daughters, excluding wife
+  // Load daughters, excluding husband and wife and filter by gender
   localDaughters.value = fam.members
     .filter(
       (id) =>
@@ -289,7 +275,7 @@ function saveChanges() {
     }
   });
 
-  // Remove non-existent sons from family members
+  // Remove non-existent sons and daughters from family members
   fam.members = fam.members.filter(
     (id) =>
       localSons.value.some((son) => son.id === id) ||

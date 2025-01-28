@@ -54,17 +54,24 @@ function addEdges(edges, source, target, label, enableLogging) {
 
 function createEdgesForRelation(family, person, relation, addEdgeFunc) {
   const familyNodeId = family.id;
-  // Simplified edge types
+
+  // Define edge types with consistent source and target directions
   const edgeTypes = {
-    Husband: { personToFamily: "Husband" },
-    Wife: { personToFamily: "Wife" },
-    Son: { personToFamily: "Son" },
-    Daughter: { personToFamily: "Daughter" },
+    Husband: { personToFamily: "Husband", from: "person", to: "family" },
+    Wife: { personToFamily: "Wife", from: "person", to: "family" },
+    Son: { personToFamily: "Son", from: "family", to: "person" },
+    Daughter: { personToFamily: "Daughter", from: "family", to: "person" },
+    Father: { personToFamily: "Father", from: "person", to: "family" },
+    Mother: { personToFamily: "Mother", from: "person", to: "family" },
   };
 
   const edgeConfig = edgeTypes[relation];
   if (edgeConfig) {
-    addEdgeFunc(person.id, familyNodeId, edgeConfig.personToFamily);
+    if (edgeConfig.from === "person" && edgeConfig.to === "family") {
+      addEdgeFunc(person.id, familyNodeId, edgeConfig.personToFamily);
+    } else if (edgeConfig.from === "family" && edgeConfig.to === "person") {
+      addEdgeFunc(familyNodeId, person.id, edgeConfig.personToFamily);
+    }
   }
 }
 
