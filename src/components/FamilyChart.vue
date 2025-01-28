@@ -114,7 +114,7 @@ const styleConfig = [
     style: {
       "background-color": (ele) => {
         if (ele.data("id").startsWith("family")) {
-          return "#DDA0DD"; // Light purple for family nodes
+          return "#DDA0DD"; // Family node color
         } else {
           return ele.data("gender") === "male" ? "#ADD8E6" : "#FFB6C1";
         }
@@ -126,7 +126,23 @@ const styleConfig = [
       "font-size": "16px",
       width: "120px",
       height: "60px",
-      shape: "round-rectangle",
+      // ▼ Use a function to pick shape by node type/gender
+      shape: (ele) => {
+        // Keep family nodes round-rectangle
+        if (ele.data("id").startsWith("family")) {
+          return "round-rectangle";
+        }
+        // Male -> rectangle
+        if (ele.data("gender") === "male") {
+          return "round-rectangle";
+        }
+        // Female -> circle (Cytoscape shape is "ellipse")
+        if (ele.data("gender") === "female") {
+          return "ellipse";
+        }
+        // Default fallback if needed
+        return "round-rectangle";
+      },
       "text-wrap": "wrap",
       "text-max-width": "110px",
     },
