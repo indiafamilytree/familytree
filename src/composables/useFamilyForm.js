@@ -52,12 +52,13 @@ export function useFamilyForm() {
       data: { id: familyId, label: "Family", isFamily: true },
     });
 
+    const role = person.gender === "male" ? "Husband" : "Wife";
     const alreadyLinked = familyTreeStore.edges.some(
       (e) => e.data.source === person.id && e.data.target === familyId
     );
     if (!alreadyLinked) {
       familyTreeStore.edges.push({
-        data: { source: person.id, target: familyId, label: "Member" },
+        data: { source: person.id, target: familyId, label: role },
       });
     }
 
