@@ -1,4 +1,4 @@
-<!-- filepath: /Users/nkannaiyan/Code/ChatGPTApps/FamilyTree/family-tree-app/src/components/MarriageForm.vue -->
+<!-- ./components/MarriageForm.vue -->
 <template>
   <div class="max-w-md mx-auto mt-10">
     <h2 class="text-2xl font-bold mb-6">Add Marriage</h2>
@@ -41,20 +41,22 @@
           </option>
         </select>
       </div>
-      <button
-        type="submit"
-        class="w-full inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-      >
-        Add Marriage
-      </button>
+      <div>
+        <!-- Replace raw button with BaseButton -->
+        <BaseButton type="submit" variant="primary"> Add Marriage </BaseButton>
+      </div>
     </form>
   </div>
 </template>
 
 <script>
 import { useFamilyTreeStore } from "../stores/familyTree";
+import BaseButton from "./BaseButton.vue";
 
 export default {
+  components: {
+    BaseButton,
+  },
   data() {
     return {
       fatherId: "",

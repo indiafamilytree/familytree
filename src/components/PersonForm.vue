@@ -1,3 +1,4 @@
+<!-- ./components/PersonForm.vue -->
 <template>
   <div class="person-form">
     <form @submit.prevent="addPerson" class="form-layout">
@@ -10,7 +11,6 @@
           class="form-input"
         />
       </div>
-
       <div class="form-group">
         <select v-model="relation" id="relation" required class="form-input">
           <option value="father">Father</option>
@@ -21,7 +21,6 @@
           <option value="wife">Wife</option>
         </select>
       </div>
-
       <div class="form-group">
         <select v-model="linkedFamilyId" id="linkedFamilyId" class="form-input">
           <option value="">Select Family (Optional)</option>
@@ -34,20 +33,23 @@
           </option>
         </select>
       </div>
-
       <div class="button-group">
-        <button type="submit" class="form-button">Add Person</button>
-        <button @click="downloadJson" class="form-button">Download JSON</button>
+        <BaseButton type="submit" variant="primary">Add Person</BaseButton>
+        <BaseButton @click="downloadJson" variant="inprogress"
+          >Download JSON</BaseButton
+        >
       </div>
       <div class="button-group">
-        <label for="file-upload" class="form-button"> Import JSON </label>
-        <input
-          type="file"
-          id="file-upload"
-          class="hidden-input"
-          @change="handleFileImport"
-          accept=".json"
-        />
+        <BaseButton tag="label" variant="primary">
+          Import JSON
+          <input
+            type="file"
+            id="file-upload"
+            class="hidden"
+            @change="handleFileImport"
+            accept=".json"
+          />
+        </BaseButton>
       </div>
     </form>
   </div>
@@ -56,6 +58,7 @@
 <script setup>
 import { ref, computed } from "vue";
 import { useFamilyTreeStore } from "@/stores/family-tree-store/index";
+import BaseButton from "@/components/BaseButton.vue";
 
 const store = useFamilyTreeStore();
 const persons = computed(() => store.persons);
@@ -65,7 +68,7 @@ const name = ref("");
 const relation = ref("father");
 const linkedFamilyId = ref("");
 
-const addPerson = () => {
+function addPerson() {
   let gender;
   if (
     relation.value === "father" ||
@@ -101,9 +104,9 @@ const addPerson = () => {
   name.value = "";
   relation.value = "father";
   linkedFamilyId.value = "";
-};
+}
 
-const downloadJson = () => {
+function downloadJson() {
   const dataStr =
     "data:text/json;charset=utf-8," +
     encodeURIComponent(JSON.stringify(store.persons));
@@ -113,9 +116,9 @@ const downloadJson = () => {
   document.body.appendChild(downloadAnchorNode);
   downloadAnchorNode.click();
   downloadAnchorNode.remove();
-};
+}
 
-const handleFileImport = (event) => {
+function handleFileImport(event) {
   const file = event.target.files[0];
   if (file) {
     const reader = new FileReader();
@@ -129,7 +132,7 @@ const handleFileImport = (event) => {
     };
     reader.readAsText(file);
   }
-};
+}
 </script>
 
 <style scoped>
@@ -139,11 +142,9 @@ const handleFileImport = (event) => {
   border-radius: 5px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
-
 .form-group {
   margin-bottom: 15px;
 }
-
 .form-input {
   width: 100%;
   padding: 8px;
@@ -151,23 +152,11 @@ const handleFileImport = (event) => {
   border-radius: 4px;
   box-sizing: border-box;
 }
-
 .button-group {
   display: flex;
   gap: 10px;
 }
-
-.form-button {
-  padding: 8px 15px;
-  border: none;
-  border-radius: 4px;
-  background-color: #42b983;
-  color: white;
-  cursor: pointer;
-  flex-grow: 1;
-}
-
-.hidden-input {
+.hidden {
   display: none;
 }
 </style>

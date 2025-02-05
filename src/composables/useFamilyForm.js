@@ -2,6 +2,7 @@
 
 import { ref } from "vue";
 import { useFamilyTreeStore } from "@/stores/family-tree-store/index";
+import { useArrayManipulation } from "@/utils/arrayUtils";
 
 /**
  * useFamilyForm: ephemeral fields + methods to create or update families
@@ -20,28 +21,18 @@ export function useFamilyForm() {
   const newSons = ref([]);
   const newDaughters = ref([]);
 
-  // For quick text entry -> push to arrays
-  const tempSonName = ref("");
-  const tempDaughterName = ref("");
+  // Use array manipulation utility
+  const {
+    tempName: tempSonName,
+    addItemLocally: addSonLocally,
+    removeItemLocally: removeSonLocally,
+  } = useArrayManipulation();
 
-  // Local array manipulation
-  function addSonLocally() {
-    if (!tempSonName.value) return;
-    newSons.value.push({ name: tempSonName.value, gender: "male" });
-    tempSonName.value = "";
-  }
-  function removeSonLocally(index) {
-    newSons.value.splice(index, 1);
-  }
-
-  function addDaughterLocally() {
-    if (!tempDaughterName.value) return;
-    newDaughters.value.push({ name: tempDaughterName.value, gender: "female" });
-    tempDaughterName.value = "";
-  }
-  function removeDaughterLocally(index) {
-    newDaughters.value.splice(index, 1);
-  }
+  const {
+    tempName: tempDaughterName,
+    addItemLocally: addDaughterLocally,
+    removeItemLocally: removeDaughterLocally,
+  } = useArrayManipulation();
 
   // Create an immediate family from a single "person"
   function createImmediateFamily(person) {
@@ -64,13 +55,9 @@ export function useFamilyForm() {
     const alreadyLinked = familyTreeStore.edges.some(
       (e) => e.data.source === person.id && e.data.target === familyId
     );
-
     if (!alreadyLinked) {
-      // If he’s male, label the edge "Husband" (or "Father" once kids exist)
-      // If she’s female, label "Wife"/"Mother"
-      const label = person.gender === "male" ? "Husband" : "Wife";
       familyTreeStore.edges.push({
-        data: { source: person.id, target: familyId, label },
+        data: { source: person.id, target: familyId, label: "Member" },
       });
     }
 
@@ -215,32 +202,23 @@ export function useFamilyForm() {
     }
 
     // Link the person as "Son" or "Daughter" from that family
-    const relation = person.gender === "male" ? "Son" : "Daughter";
     familyTreeStore.edges.push({
       data: {
-        source: newFamilyId,
-        target: person.id,
-        label: relation,
+        source: person.id,
+        target: newFamilyId,
+        label: person.gender === "male" ? "Son" : "Daughter",
       },
     });
 
-    // Add edges for father and mother if they exist
+    // Link father and mother to the family
     if (fatherId) {
       familyTreeStore.edges.push({
-        data: {
-          source: fatherId,
-          target: newFamilyId,
-          label: "Father",
-        },
+        data: { source: fatherId, target: newFamilyId, label: "Father" },
       });
     }
     if (motherId) {
       familyTreeStore.edges.push({
-        data: {
-          source: motherId,
-          target: newFamilyId,
-          label: "Mother",
-        },
+        data: { source: motherId, target: newFamilyId, label: "Mother" },
       });
     }
 
@@ -275,10 +253,11 @@ export function useFamilyForm() {
     tempSonName,
     tempDaughterName,
 
-    addSonLocally,
-    removeSonLocally,
-    addDaughterLocally,
-    removeDaughterLocally,
+    addSonLocally: () => addSonLocally(newSons, "male"),
+    removeSonLocally: (index) => removeSonLocally(newSons, index),
+    addDaughterLocally: () => addDaughterLocally(newDaughters, "female"),
+    removeDaughterLocally: (index) =>
+      removeDaughterLocally(newDaughters, index),
 
     createImmediateFamily,
     createAncestralFamily,
