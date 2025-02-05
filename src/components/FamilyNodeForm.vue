@@ -373,13 +373,14 @@ function addNewPersonToFamily(fam, name, relation, gender) {
   if (!fam.members.includes(newPersonId)) {
     fam.members.push(newPersonId);
   }
-  store.edges.push({
-    data: {
-      source: newPersonId,
-      target: fam.id,
-      label: relation,
-    },
-  });
+
+  // Determine edge direction:
+  const isChild = relation === "Son" || relation === "Daughter";
+  const edgeData = isChild
+    ? { source: fam.id, target: newPersonId, label: relation }
+    : { source: newPersonId, target: fam.id, label: relation };
+
+  store.edges.push({ data: edgeData });
   updateFamilyNodeLabel(fam);
 }
 
