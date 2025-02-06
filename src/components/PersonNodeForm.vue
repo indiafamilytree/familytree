@@ -1,15 +1,37 @@
 <!-- ./components/PersonNodeForm.vue -->
 <template>
   <div class="person-node-form">
-    <div class="initial-buttons">
-      <BaseButton @click="showImmediateFamilyForm = true" variant="primary">
-        Immediate
-      </BaseButton>
-      <BaseButton @click="showAncestralFamilyForm = true" variant="primary">
-        Ancestral
-      </BaseButton>
+    <!-- Family Option at the Top -->
+    <div class="options-top">
+      <label class="options-label">Family Option:</label>
+      <select
+        v-model="selectedFamilyOption"
+        @change="handleOptionSelection"
+        class="option-select"
+      >
+        <option disabled value="">-- Select an Option --</option>
+        <option value="immediate">Immediate</option>
+        <option value="ancestral">Ancestral</option>
+        <option value="existing">Family with Existing Node</option>
+      </select>
     </div>
 
+    <!-- When awaiting second person selection -->
+    <div v-if="awaitSecondPerson" class="form-section">
+      <h4>Family with Existing Node</h4>
+      <p>Please select a second person from the chart.</p>
+      <div class="button-group">
+        <BaseButton
+          @click="cancelExistingFamily"
+          variant="danger"
+          class="cancel-button"
+        >
+          Cancel
+        </BaseButton>
+      </div>
+    </div>
+
+    <!-- Immediate Family Form -->
     <div v-if="showImmediateFamilyForm" class="form-section">
       <h4>Add Immediate Family</h4>
       <div class="form-group">
@@ -21,14 +43,22 @@
         <label>New Son:</label>
         <div class="input-group">
           <input v-model="tempSonName" type="text" />
-          <BaseButton @click="addSonLocally" variant="primary">+</BaseButton>
+          <BaseButton
+            @click="addSonLocally"
+            variant="primary"
+            class="add-button"
+            >+</BaseButton
+          >
         </div>
         <ul>
           <li v-for="(son, i) in newSons" :key="i" class="list-item">
             <span>{{ son.name }}</span>
-            <BaseButton @click="removeSonLocally(i)" variant="danger">
-              Remove
-            </BaseButton>
+            <BaseButton
+              @click="removeSonLocally(i)"
+              variant="danger"
+              class="remove-button"
+              >X</BaseButton
+            >
           </li>
         </ul>
       </div>
@@ -37,28 +67,35 @@
         <label>New Daughter:</label>
         <div class="input-group">
           <input v-model="tempDaughterName" type="text" />
-          <BaseButton @click="addDaughterLocally" variant="primary"
+          <BaseButton
+            @click="addDaughterLocally"
+            variant="primary"
+            class="add-button"
             >+</BaseButton
           >
         </div>
         <ul>
           <li v-for="(daughter, i) in newDaughters" :key="i" class="list-item">
             <span>{{ daughter.name }}</span>
-            <BaseButton @click="removeDaughterLocally(i)" variant="danger">
-              Remove
-            </BaseButton>
+            <BaseButton
+              @click="removeDaughterLocally(i)"
+              variant="danger"
+              class="remove-button"
+              >X</BaseButton
+            >
           </li>
         </ul>
       </div>
 
       <div class="button-group">
-        <BaseButton @click="confirmImmediateFamily" variant="primary">
-          Create Family
-        </BaseButton>
-        <BaseButton @click="cancel" variant="danger"> Cancel </BaseButton>
+        <BaseButton @click="confirmImmediateFamily" variant="primary"
+          >Create Family</BaseButton
+        >
+        <BaseButton @click="cancel" variant="danger">Cancel</BaseButton>
       </div>
     </div>
 
+    <!-- Ancestral Family Form -->
     <div v-if="showAncestralFamilyForm" class="form-section">
       <h4>Add Ancestral Family</h4>
       <div class="form-group">
@@ -71,10 +108,10 @@
       </div>
 
       <div class="button-group">
-        <BaseButton @click="confirmAncestralFamily" variant="primary">
-          Create Ancestral Family
-        </BaseButton>
-        <BaseButton @click="cancel" variant="danger"> Cancel </BaseButton>
+        <BaseButton @click="confirmAncestralFamily" variant="primary"
+          >Create Ancestral Family</BaseButton
+        >
+        <BaseButton @click="cancel" variant="danger">Cancel</BaseButton>
       </div>
     </div>
   </div>
@@ -88,10 +125,7 @@ import BaseButton from "@/components/BaseButton.vue";
 const props = defineProps({
   personData: { type: Object, required: true },
 });
-const emit = defineEmits(["update:personData", "close"]);
-
-const showImmediateFamilyForm = ref(false);
-const showAncestralFamilyForm = ref(false);
+const emit = defineEmits(["update:personData", "close", "await-second-person"]);
 
 const {
   spouseName,
@@ -109,6 +143,38 @@ const {
   createAncestralFamily,
   resetForm,
 } = useFamilyForm();
+
+// New state for the dropdown and for awaiting second person selection
+const selectedFamilyOption = ref("");
+const awaitSecondPerson = ref(false);
+const showImmediateFamilyForm = ref(false);
+const showAncestralFamilyForm = ref(false);
+
+function handleOptionSelection() {
+  if (selectedFamilyOption.value === "immediate") {
+    showImmediateFamilyForm.value = true;
+    showAncestralFamilyForm.value = false;
+    awaitSecondPerson.value = false;
+  } else if (selectedFamilyOption.value === "ancestral") {
+    showAncestralFamilyForm.value = true;
+    showImmediateFamilyForm.value = false;
+    awaitSecondPerson.value = false;
+  } else if (selectedFamilyOption.value === "existing") {
+    awaitSecondPerson.value = true;
+    // Notify the parent or chart that we're awaiting a second person selection.
+    emit("await-second-person", true);
+    // Hide the dropdown while waiting.
+    showImmediateFamilyForm.value = false;
+    showAncestralFamilyForm.value = false;
+  }
+}
+
+function cancelExistingFamily() {
+  awaitSecondPerson.value = false;
+  emit("await-second-person", false);
+  // Reset dropdown selection to prompt again.
+  selectedFamilyOption.value = "";
+}
 
 function confirmImmediateFamily() {
   createImmediateFamily(props.personData);
@@ -129,6 +195,7 @@ function confirmAncestralFamily() {
 function cancel() {
   showImmediateFamilyForm.value = false;
   showAncestralFamilyForm.value = false;
+  selectedFamilyOption.value = "";
   resetForm();
   emit("close");
 }
@@ -142,11 +209,27 @@ function cancel() {
   background-color: #f9f9f9;
   font-family: sans-serif;
 }
-h4 {
-  font-size: 1rem;
-  font-weight: 600;
+
+/* Dropdown styling */
+.options-top {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
   margin-bottom: 10px;
 }
+.options-label {
+  font-weight: 600;
+  margin-bottom: 5px;
+}
+.option-select {
+  padding: 5px;
+  font-size: 1rem;
+  width: 100%;
+  max-width: 250px;
+}
+
+/* Form section styling */
 .form-section {
   margin-bottom: 15px;
 }
@@ -189,12 +272,6 @@ ul {
   display: flex;
   gap: 10px;
   justify-content: flex-end;
-  margin-top: 10px;
-}
-.initial-buttons {
-  display: flex;
-  gap: 10px;
-  justify-content: center;
   margin-top: 10px;
 }
 </style>

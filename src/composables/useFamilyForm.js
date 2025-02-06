@@ -147,26 +147,27 @@ export function useFamilyForm() {
   }
 
   // Create an ancestral family for a single "person" => father & mother
+
   function createAncestralFamily(person) {
     if (!person) return;
 
     let fatherId = null;
     let motherId = null;
 
-    // If fatherName was typed, create father
+    // If fatherName was provided, create a father
     if (fatherName.value) {
       fatherId = `person-${familyTreeStore.persons.length + 1}`;
       familyTreeStore.persons.push({
         id: fatherId,
         name: fatherName.value,
         gender: "male",
-        familyLinks: [],
+        familyLinks: [], // if using familyLinks elsewhere
       });
       familyTreeStore.nodes.push({
         data: { id: fatherId, label: fatherName.value, gender: "male" },
       });
     }
-    // If motherName was typed, create mother
+    // If motherName was provided, create a mother
     if (motherName.value) {
       motherId = `person-${familyTreeStore.persons.length + 1}`;
       familyTreeStore.persons.push({
@@ -180,36 +181,38 @@ export function useFamilyForm() {
       });
     }
 
+    // Create a new family with explicit fields
     const newFamilyId = `family-${familyTreeStore.families.length + 1}`;
-    familyTreeStore.families.push({
+    const newFamily = {
       id: newFamilyId,
       husbandId: fatherId,
       wifeId: motherId,
       sons: [],
       daughters: [],
-    });
+    };
+    familyTreeStore.families.push(newFamily);
     familyTreeStore.nodes.push({
       data: { id: newFamilyId, label: "Family", isFamily: true },
     });
 
-    // Add the person as a child of this ancestral family.
-    const family = familyTreeStore.families.find((f) => f.id === newFamilyId);
+    // Add the person as a child to this ancestral family
     if (person.gender === "male") {
-      family.sons.push(person.id);
+      newFamily.sons.push(person.id);
     } else {
-      family.daughters.push(person.id);
+      newFamily.daughters.push(person.id);
     }
 
-    // Link the person as "Son" or "Daughter" from that family
+    // Create the child edge with reversed direction:
+    // For ancestral families, the edge should go from the family node to the person.
     familyTreeStore.edges.push({
       data: {
-        source: person.id,
-        target: newFamilyId,
+        source: newFamilyId, // from family node
+        target: person.id, // to person node
         label: person.gender === "male" ? "Son" : "Daughter",
       },
     });
 
-    // Link father and mother to the family, if they exist
+    // Create edges for the father and mother if they exist.
     if (fatherId) {
       familyTreeStore.edges.push({
         data: { source: fatherId, target: newFamilyId, label: "Father" },
@@ -221,7 +224,7 @@ export function useFamilyForm() {
       });
     }
 
-    // Update family node label
+    // Update the family node label to display parent names.
     const familyNode = familyTreeStore.nodes.find(
       (n) => n.data.id === newFamilyId
     );
