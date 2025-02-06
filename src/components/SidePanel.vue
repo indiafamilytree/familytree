@@ -25,10 +25,10 @@
     <!-- Footer actions -->
     <div class="footer-actions">
       <BaseButton @click="downloadTree" variant="inprogress">
-        Download Tree
+        Download
       </BaseButton>
       <BaseButton @click="triggerFileInput" variant="primary">
-        Import Tree
+        Import
       </BaseButton>
     </div>
     <!-- Hidden file input wrapped in a div to keep it out of view -->

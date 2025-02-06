@@ -1,3 +1,4 @@
+<!-- App.vue -->
 <template>
   <div class="app-container">
     <FamilyChart
@@ -16,42 +17,25 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from "vue";
-import { useFamilyTreeStore } from "@/stores/family-tree-store/index";
+import { ref, watch } from "vue";
 import FamilyChart from "@/components/FamilyChart.vue";
 import SidePanel from "@/components/SidePanel.vue";
+import { useFamilyTreeStore } from "@/stores/family-tree-store/index";
 
 const selectedNodeData = ref(null);
 const familyChartRef = ref(null);
 const store = useFamilyTreeStore();
 
-onMounted(() => {
-  // Initialize the root person only if the store is empty
-  if (store.persons.length === 0) {
-    store.initializeRootPerson({
-      name: "Kannaiyan",
-      gender: "male",
-    });
-  }
-});
+// Define showSidePanel so that it is available in the template.
+const showSidePanel = ref(true);
 
-const showSidePanel = ref(true); // Initially show the side panel
+function selectNode(nodeData) {
+  selectedNodeData.value = nodeData;
+}
 
-const selectNode = (nodeData) => {
-  // Check if clicking on the same node as currently selected
-  if (nodeData?.id === selectedNodeData.value?.id) {
-    selectedNodeData.value = null; // Deselect if clicking the same node
-    showSidePanel.value = true; // Show panel for deselected state, in this specific scenario its for adding a new person.
-  } else {
-    selectedNodeData.value = nodeData;
-    showSidePanel.value = true; // Ensure the side panel is shown when a node is selected
-  }
-};
-
-const closeSidePanel = () => {
+function closeSidePanel() {
   selectedNodeData.value = null;
-  showSidePanel.value = true; // Show the side panel for adding new person to the tree, even after closing from close button
-};
+}
 
 watch(
   () => selectedNodeData.value,
@@ -69,13 +53,13 @@ watch(
   height: 100vh;
 }
 
+/* Adjust the width of the chart to account for the wider side panel */
 .family-chart {
-  /* Remove flex-grow  and use width instead*/
-  width: calc(100% - 350px); /* Adjust 350px if your side panel width changes */
+  width: calc(100% - 400px); /* Changed from 350px to 400px */
 }
 
 .side-panel {
-  width: 350px; /* Fixed width for the side panel */
+  width: 400px; /* Increased width for larger forms */
   overflow-y: auto;
 }
 </style>

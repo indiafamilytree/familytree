@@ -3,6 +3,7 @@
   <div class="form-container">
     <h3 class="form-title">Family Details</h3>
     <div v-if="familyData" class="form-body">
+      <!-- Husband -->
       <div class="form-group">
         <label class="form-label">Husband:</label>
         <div class="input-button-group">
@@ -22,6 +23,7 @@
         </div>
       </div>
 
+      <!-- Wife -->
       <div class="form-group">
         <label class="form-label">Wife:</label>
         <div class="input-button-group">
@@ -41,6 +43,7 @@
         </div>
       </div>
 
+      <!-- Sons list -->
       <div class="form-group">
         <label class="form-label">Sons:</label>
         <ul class="list">
@@ -51,15 +54,15 @@
               class="form-input list-input"
             />
             <span v-else class="list-text">{{ son.name }}</span>
-            <div class="button-group">
+            <div class="button-group" v-if="isEditing">
               <BaseButton
-                v-if="isEditing"
                 @click="saveSon(son)"
                 variant="primary"
                 class="save-button"
               >
                 ✓
               </BaseButton>
+              <!-- Remove button now shows "X" -->
               <BaseButton
                 @click="removeSon(son.id)"
                 variant="danger"
@@ -83,6 +86,7 @@
         </div>
       </div>
 
+      <!-- Daughters list -->
       <div class="form-group">
         <label class="form-label">Daughters:</label>
         <ul class="list">
@@ -97,10 +101,9 @@
               class="form-input list-input"
             />
             <span v-else class="list-text">{{ daughter.name }}</span>
-            <div class="button-group">
-              <!-- For daughters, there's no "save" button in the original code -->
+            <div class="button-group" v-if="isEditing">
+              <!-- Remove button now shows "X" -->
               <BaseButton
-                v-if="isEditing"
                 @click="removeDaughter(daughter.id)"
                 variant="danger"
                 class="remove-button"
@@ -127,6 +130,7 @@
         </div>
       </div>
 
+      <!-- Form Actions -->
       <div class="form-actions">
         <BaseButton
           v-if="!isEditing"
@@ -206,7 +210,6 @@ function loadFamily(familyId) {
   localSons.value = fam.sons
     .map((id) => store.persons.find((p) => p.id === id))
     .filter(Boolean);
-
   localDaughters.value = fam.daughters
     .map((id) => store.persons.find((p) => p.id === id))
     .filter(Boolean);
@@ -237,12 +240,26 @@ function addNewDaughter() {
 }
 
 function removeSon(sonId) {
+  // Remove from the local list
   localSons.value = localSons.value.filter((son) => son.id !== sonId);
+  // Remove the person from the store
+  store.persons = store.persons.filter((p) => p.id !== sonId);
+  // Remove the corresponding node
+  store.nodes = store.nodes.filter((n) => n.data.id !== sonId);
+  // Remove any edges that reference this person
+  store.edges = store.edges.filter(
+    (e) => e.data.source !== sonId && e.data.target !== sonId
+  );
 }
 
 function removeDaughter(daughterId) {
   localDaughters.value = localDaughters.value.filter(
     (daughter) => daughter.id !== daughterId
+  );
+  store.persons = store.persons.filter((p) => p.id !== daughterId);
+  store.nodes = store.nodes.filter((n) => n.data.id !== daughterId);
+  store.edges = store.edges.filter(
+    (e) => e.data.source !== daughterId && e.data.target !== daughterId
   );
 }
 
@@ -252,63 +269,52 @@ function saveChanges() {
   if (!fam) return;
 
   // Update spouse information
-  updateHusband(fam); // should update fam.husbandId and the corresponding person record
-  updateWife(fam); // should update fam.wifeId and the corresponding person record
+  updateHusband(fam);
+  updateWife(fam);
 
   // Update sons and daughters arrays explicitly from your local form state.
-  // Assuming localSons and localDaughters are arrays of person objects.
   fam.sons = localSons.value.map((son) => son.id);
   fam.daughters = localDaughters.value.map((daughter) => daughter.id);
 
-  // If you still have any edge updates (or if you rebuild the chart), do them here.
+  // Remove extraneous child edges
+  store.edges = store.edges.filter((edge) => {
+    if (edge.data.source === fam.id && edge.data.label === "Son") {
+      return fam.sons.includes(edge.data.target);
+    }
+    if (edge.data.source === fam.id && edge.data.label === "Daughter") {
+      return fam.daughters.includes(edge.data.target);
+    }
+    return true;
+  });
+
   updateEdgeLabels(fam);
 
   isEditing.value = false;
-  loadFamily(props.familyData.id); // reload the updated family details for the form
+  loadFamily(props.familyData.id);
 }
 
 function updateEdgeLabels(fam) {
-  // Update the spouse edges.
-  // For the husband edge, assume the edge was created with:
-  //   { source: fam.husbandId, target: fam.id, label: "Husband" }
+  // Update husband edge
   if (fam.husbandId) {
     const husbandEdge = store.edges.find(
       (e) => e.data.source === fam.husbandId && e.data.target === fam.id
     );
     if (husbandEdge) {
-      // If there are children, change the label to "Father"
-      if (
-        (fam.sons && fam.sons.length > 0) ||
-        (fam.daughters && fam.daughters.length > 0)
-      ) {
-        husbandEdge.data.label = "Father";
-      } else {
-        husbandEdge.data.label = "Husband";
-      }
+      husbandEdge.data.label =
+        fam.sons.length > 0 || fam.daughters.length > 0 ? "Father" : "Husband";
     }
   }
-
-  // For the wife edge, assume the edge was created with:
-  //   { source: fam.wifeId, target: fam.id, label: "Wife" }
+  // Update wife edge
   if (fam.wifeId) {
     const wifeEdge = store.edges.find(
       (e) => e.data.source === fam.wifeId && e.data.target === fam.id
     );
     if (wifeEdge) {
-      if (
-        (fam.sons && fam.sons.length > 0) ||
-        (fam.daughters && fam.daughters.length > 0)
-      ) {
-        wifeEdge.data.label = "Mother";
-      } else {
-        wifeEdge.data.label = "Wife";
-      }
+      wifeEdge.data.label =
+        fam.sons.length > 0 || fam.daughters.length > 0 ? "Mother" : "Wife";
     }
   }
-
-  // Update the child edges.
-  // For sons, assume the edge was created with:
-  //   { source: fam.id, target: childId, label: "Son" }
+  // Update child edges for sons
   if (Array.isArray(fam.sons)) {
     fam.sons.forEach((childId) => {
       const sonEdge = store.edges.find(
@@ -319,9 +325,7 @@ function updateEdgeLabels(fam) {
       }
     });
   }
-
-  // For daughters, assume the edge was created with:
-  //   { source: fam.id, target: childId, label: "Daughter" }
+  // Update child edges for daughters
   if (Array.isArray(fam.daughters)) {
     fam.daughters.forEach((childId) => {
       const daughterEdge = store.edges.find(
@@ -346,7 +350,6 @@ function updateHusband(fam) {
       addNewPersonToFamily(fam, localHusbandName.value, "Husband", "male");
     }
   } else if (fam.husbandId) {
-    // Remove the husband by simply clearing the husbandId
     fam.husbandId = null;
   }
 }
@@ -363,7 +366,6 @@ function updateWife(fam) {
       addNewPersonToFamily(fam, localWifeName.value, "Wife", "female");
     }
   } else if (fam.wifeId) {
-    // Simply clear the wifeId if no wife name is provided
     fam.wifeId = null;
   }
 }
@@ -436,9 +438,6 @@ function addNewPersonToFamily(fam, name, relation, gender) {
     fam.daughters.push(newPersonId);
   }
 
-  // Determine edge direction:
-  // For children, the edge is from the family node to the child.
-  // For spouse relationships, the edge is from the new person to the family node.
   const isChild = relation === "Son" || relation === "Daughter";
   const edgeData = isChild
     ? { source: fam.id, target: newPersonId, label: relation }
@@ -483,10 +482,12 @@ function cancelEdit() {
   font-weight: 500;
 }
 .form-input {
-  padding: 5px;
+  padding: 8px;
   border: 1px solid #ccc;
   border-radius: 4px;
-  font-size: 0.9rem;
+  font-size: 1rem;
+  width: 100%;
+  box-sizing: border-box;
 }
 .list {
   margin-top: 5px;
@@ -498,22 +499,25 @@ function cancelEdit() {
   align-items: center;
   justify-content: space-between;
   margin-bottom: 5px;
-  padding: 5px;
+  padding: 8px;
   border: 1px solid #ccc;
   border-radius: 4px;
   background-color: #fff;
 }
 .list-input {
   flex-grow: 1;
-  margin-right: 5px;
+  margin-right: 10px;
+  font-size: 1rem;
 }
 .list-text {
-  margin-right: 5px;
+  margin-right: 10px;
   flex-grow: 1;
+  font-size: 1rem;
 }
 .button-group {
   display: flex;
   gap: 5px;
+  align-items: center;
 }
 .form-button {
   padding: 5px 10px;
@@ -526,31 +530,41 @@ function cancelEdit() {
 .save-button {
   background-color: #28a745;
   color: white;
+  font-size: 1.2rem;
+  padding: 6px 8px;
 }
 .remove-button {
   background-color: #dc3545;
   color: white;
+  font-size: 1.2rem;
+  padding: 6px 8px;
 }
 .add-button {
   background-color: #007bff;
   color: white;
+  padding: 6px 8px;
+  font-size: 1.2rem;
 }
 .edit-button {
   background-color: #ffc107;
   color: white;
+  padding: 6px 8px;
 }
 .cancel-button {
   background-color: #6c757d;
   color: white;
+  padding: 6px 8px;
 }
 .add-input-group {
   display: flex;
   gap: 5px;
+  align-items: center;
 }
 .input-button-group {
   display: flex;
   align-items: center;
   gap: 5px;
+  width: 100%;
 }
 .input-button-group .form-input {
   flex-grow: 1;
