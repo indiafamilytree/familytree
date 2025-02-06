@@ -17,7 +17,7 @@
             variant="primary"
             class="save-button"
           >
-            Save
+            ✓
           </BaseButton>
         </div>
       </div>
@@ -36,7 +36,7 @@
             variant="primary"
             class="save-button"
           >
-            Save
+            ✓
           </BaseButton>
         </div>
       </div>
@@ -58,14 +58,14 @@
                 variant="primary"
                 class="save-button"
               >
-                Save
+                ✓
               </BaseButton>
               <BaseButton
                 @click="removeSon(son.id)"
                 variant="danger"
                 class="remove-button"
               >
-                Remove
+                X
               </BaseButton>
             </div>
           </li>
@@ -78,7 +78,7 @@
             class="form-input"
           />
           <BaseButton @click="addNewSon" variant="primary" class="add-button">
-            Add
+            +
           </BaseButton>
         </div>
       </div>
@@ -98,13 +98,14 @@
             />
             <span v-else class="list-text">{{ daughter.name }}</span>
             <div class="button-group">
+              <!-- For daughters, there's no "save" button in the original code -->
               <BaseButton
                 v-if="isEditing"
                 @click="removeDaughter(daughter.id)"
                 variant="danger"
                 class="remove-button"
               >
-                Remove
+                X
               </BaseButton>
             </div>
           </li>
@@ -121,7 +122,7 @@
             variant="primary"
             class="add-button"
           >
-            Add
+            +
           </BaseButton>
         </div>
       </div>
@@ -271,7 +272,7 @@ function updateEdgeLabels(fam) {
   // For the husband edge, assume the edge was created with:
   //   { source: fam.husbandId, target: fam.id, label: "Husband" }
   if (fam.husbandId) {
-    const husbandEdge = this.edges.find(
+    const husbandEdge = store.edges.find(
       (e) => e.data.source === fam.husbandId && e.data.target === fam.id
     );
     if (husbandEdge) {
@@ -290,7 +291,7 @@ function updateEdgeLabels(fam) {
   // For the wife edge, assume the edge was created with:
   //   { source: fam.wifeId, target: fam.id, label: "Wife" }
   if (fam.wifeId) {
-    const wifeEdge = this.edges.find(
+    const wifeEdge = store.edges.find(
       (e) => e.data.source === fam.wifeId && e.data.target === fam.id
     );
     if (wifeEdge) {
@@ -310,7 +311,7 @@ function updateEdgeLabels(fam) {
   //   { source: fam.id, target: childId, label: "Son" }
   if (Array.isArray(fam.sons)) {
     fam.sons.forEach((childId) => {
-      const sonEdge = this.edges.find(
+      const sonEdge = store.edges.find(
         (e) => e.data.source === fam.id && e.data.target === childId
       );
       if (sonEdge) {
@@ -323,7 +324,7 @@ function updateEdgeLabels(fam) {
   //   { source: fam.id, target: childId, label: "Daughter" }
   if (Array.isArray(fam.daughters)) {
     fam.daughters.forEach((childId) => {
-      const daughterEdge = this.edges.find(
+      const daughterEdge = store.edges.find(
         (e) => e.data.source === fam.id && e.data.target === childId
       );
       if (daughterEdge) {
@@ -374,7 +375,6 @@ function saveHusband() {
     );
     if (husband) {
       husband.name = localHusbandName.value;
-      // Optionally update any graph node labels here.
       console.log("Husband updated:", husband);
     }
     isEditing.value = false;
@@ -392,11 +392,19 @@ function saveWife() {
   }
 }
 
-function updatePersonName(personId, newName) {
-  const person = store.persons.find((p) => p.id === personId);
-  if (person) {
-    person.name = newName;
-    updateNodeLabel(person.id, newName);
+function updateNodeLabel(personId, newName) {
+  const nodeRef = store.nodes.find((n) => n.data.id === personId);
+  if (nodeRef) nodeRef.data.label = newName;
+}
+
+function updateFamilyNodeLabel(fam) {
+  const familyNode = store.nodes.find((n) => n.data.id === fam.id);
+  if (familyNode) {
+    const husbandLabel = localHusbandName.value
+      ? `${localHusbandName.value}\n`
+      : "";
+    const wifeLabel = localWifeName.value;
+    familyNode.data.label = husbandLabel + wifeLabel;
   }
 }
 
@@ -438,22 +446,6 @@ function addNewPersonToFamily(fam, name, relation, gender) {
 
   store.edges.push({ data: edgeData });
   updateFamilyNodeLabel(fam);
-}
-
-function updateNodeLabel(personId, newName) {
-  const nodeRef = store.nodes.find((n) => n.data.id === personId);
-  if (nodeRef) nodeRef.data.label = newName;
-}
-
-function updateFamilyNodeLabel(fam) {
-  const familyNode = store.nodes.find((n) => n.data.id === fam.id);
-  if (familyNode) {
-    const husbandLabel = localHusbandName.value
-      ? `${localHusbandName.value}\n`
-      : "";
-    const wifeLabel = localWifeName.value;
-    familyNode.data.label = husbandLabel + wifeLabel;
-  }
 }
 
 function cancelEdit() {
