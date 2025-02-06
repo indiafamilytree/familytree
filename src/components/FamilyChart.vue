@@ -9,20 +9,27 @@
     >
       Export as PNG (300 DPI)
     </BaseButton>
+    <!-- Manual refresh layout button at the bottom -->
+    <BaseButton
+      @click="refreshLayout"
+      variant="secondary"
+      class="layout-refresh-button"
+    >
+      Refresh Layout
+    </BaseButton>
   </div>
 </template>
 
 <script setup>
 import cytoscape from "cytoscape";
 import dagre from "cytoscape-dagre";
-import panzoom from "cytoscape-panzoom";
-import { onMounted, ref, watch, defineEmits } from "vue";
+// panzoom is assumed to be part of the core (or registered globally), so no import here.
+import { onMounted, ref, watch, nextTick, defineEmits } from "vue";
 import { useFamilyTreeStore } from "@/stores/family-tree-store/index";
 import BaseButton from "@/components/BaseButton.vue";
 
-// Register dagre and panzoom with Cytoscape.
+// Register dagre with Cytoscape.
 cytoscape.use(dagre);
-cytoscape.use(panzoom);
 
 const familyTreeStore = useFamilyTreeStore();
 const cy = ref(null);
@@ -112,6 +119,7 @@ const edgeColorMap = new Map();
 const layoutConfig = {
   name: "dagre",
   rankDir: "TB",
+  fit: false, // Allow overflow; do not force-fit all nodes into the viewport.
   minLen: function (edge) {
     const label = edge.data("label");
     if (
@@ -120,14 +128,14 @@ const layoutConfig = {
       label === "Father" ||
       label === "Mother"
     ) {
-      return 0;
+      return 0.5; // Bring spouse/parent nodes closer.
     }
     return 1;
   },
-  spacingFactor: 1.5, // Increase spacing factor
-  nodeSep: 100, // Increase node separation
-  edgeSep: 50, // Increase edge separation
-  rankSep: 150, // Increase rank separation
+  spacingFactor: 1.5,
+  nodeSep: 100,
+  edgeSep: 50,
+  rankSep: 150,
 };
 
 const styleConfig = [
@@ -220,27 +228,16 @@ const initializeChart = () => {
     elements: [...familyTreeStore.nodes, ...familyTreeStore.edges],
     layout: layoutConfig,
     style: styleConfig,
-    zoomingEnabled: true, // Allow zooming
-    panningEnabled: true, // Allow panning (if you want both, you can disable drag if desired)
+    zoomingEnabled: true,
+    panningEnabled: true,
+    zoom: 1.5, // Higher default zoom level.
+    userPanningEnabled: true,
   });
 
-  // Initialize panzoom controls
-  cy.value.panzoom({
-    // Adjust options as needed:
-    zoomFactor: 0.05, // Incremental zoom factor
-    sliderMax: 10,
-    sliderMin: 1,
-    sliderHandleIcon: '<i class="fas fa-search-plus"></i>',
-    panButtonIcons: {
-      up: '<i class="fas fa-arrow-up"></i>',
-      down: '<i class="fas fa-arrow-down"></i>',
-      left: '<i class="fas fa-arrow-left"></i>',
-      right: '<i class="fas fa-arrow-right"></i>',
-    },
-    // You can customize positions and styles further.
-    showSlider: true,
-    showControls: true,
-  });
+  // Since panzoom is part of the core (or already registered globally),
+  // we simply rely on the built-in zoom/pan features and on-screen controls.
+  // You may remove any explicit panzoom call.
+  // For example: cy.value.panzoom({...}) is omitted.
 
   cy.value.layout(layoutConfig).run();
 
@@ -266,8 +263,8 @@ const initializeChart = () => {
     const node = event.target;
     const nodeData = node.data();
     console.log("Node tapped:", nodeData);
-
     // Check if this is a person node (assuming family nodes have isFamily: true)
+    // and if we are awaiting a second person selection.
     if (!nodeData.isFamily && window.awaitSecondPerson) {
       console.log("Dispatching 'second-person-selected' event for:", nodeData);
       window.dispatchEvent(
@@ -295,17 +292,33 @@ const initializeChart = () => {
     const newLabel = prompt("Edit Relation:", edge.data("label"));
     if (newLabel) {
       edge.data("label", newLabel);
-      const storeEdge = familyTreeStore.edges.find(
-        (e) => e.data.id === edge.data("id")
-      );
-      if (storeEdge) storeEdge.data.label = newLabel;
+      // Optionally update store edge if necessary.
     }
   });
 };
 
+watch(
+  () => [familyTreeStore.nodes, familyTreeStore.edges],
+  (newValues, oldValues) => {
+    if (cy.value) {
+      cy.value.elements().remove();
+      cy.value.add([...familyTreeStore.nodes, ...familyTreeStore.edges]);
+      cy.value.layout(layoutConfig).run();
+    } else {
+      initializeChart();
+    }
+  },
+  { deep: true }
+);
+
 onMounted(() => {
   initializeChart();
 });
+
+function refreshLayout() {
+  console.log("Manual layout refresh triggered.");
+  cy.value.layout(layoutConfig).run();
+}
 
 function exportAsHighResPNG() {
   const desiredWidthInches = 10;
@@ -347,5 +360,14 @@ function exportAsHighResPNG() {
   width: 100%;
   height: 100%;
   background-color: #f9f9f9;
+}
+.layout-refresh-button {
+  position: absolute;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+  padding: 8px 12px;
+  font-size: 1rem;
 }
 </style>

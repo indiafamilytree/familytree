@@ -91,7 +91,7 @@
         <label class="form-label">Daughters:</label>
         <ul class="list">
           <li
-            v-for="daughter in localDaughters"
+            v-for="(daughter, i) in localDaughters"
             :key="daughter.id"
             class="list-item"
           >
@@ -102,7 +102,13 @@
             />
             <span v-else class="list-text">{{ daughter.name }}</span>
             <div class="button-group" v-if="isEditing">
-              <!-- Remove button now shows "X" -->
+              <BaseButton
+                @click="saveDaughter(daughter)"
+                variant="primary"
+                class="save-button"
+              >
+                ✓
+              </BaseButton>
               <BaseButton
                 @click="removeDaughter(daughter.id)"
                 variant="danger"
@@ -413,6 +419,25 @@ function saveWife() {
       console.log("Wife updated:", wife);
     }
     isEditing.value = false;
+  }
+}
+
+// Save functions for Son and Daughter.
+function saveSon(son) {
+  const s = store.persons.find((p) => p.id === son.id);
+  if (s) {
+    s.name = son.name;
+    updateNodeLabel(s.id, s.name);
+    console.log("Son updated:", s);
+  }
+}
+
+function saveDaughter(daughter) {
+  const d = store.persons.find((p) => p.id === daughter.id);
+  if (d) {
+    d.name = daughter.name;
+    updateNodeLabel(d.id, d.name);
+    console.log("Daughter updated:", d);
   }
 }
 
