@@ -192,32 +192,23 @@ watch(
 function loadFamily(familyId) {
   const fam = store.families.find((f) => f.id === familyId);
   if (!fam) return;
+  console.log(fam);
+  // Load husband and wife names using their IDs
   localHusbandName.value = fam.husbandId
     ? store.persons.find((p) => p.id === fam.husbandId)?.name || ""
     : "";
   localWifeName.value = fam.wifeId
     ? store.persons.find((p) => p.id === fam.wifeId)?.name || ""
     : "";
-  localSons.value = fam.members
-    .filter(
-      (id) =>
-        id !== fam.husbandId &&
-        id !== fam.wifeId &&
-        store.persons.find((p) => p.id === id && p.gender === "male")
-    )
-    .map((id) => ({
-      ...store.persons.find((p) => p.id === id),
-    }));
-  localDaughters.value = fam.members
-    .filter(
-      (id) =>
-        id !== fam.husbandId &&
-        id !== fam.wifeId &&
-        store.persons.find((p) => p.id === id && p.gender === "female")
-    )
-    .map((id) => ({
-      ...store.persons.find((p) => p.id === id),
-    }));
+
+  // For children, look up each ID in the sons/daughters arrays.
+  localSons.value = fam.sons
+    .map((id) => store.persons.find((p) => p.id === id))
+    .filter(Boolean);
+
+  localDaughters.value = fam.daughters
+    .map((id) => store.persons.find((p) => p.id === id))
+    .filter(Boolean);
 }
 
 function addNewSon() {
@@ -258,58 +249,88 @@ function saveChanges() {
   if (!props.familyData) return;
   const fam = store.families.find((f) => f.id === props.familyData.id);
   if (!fam) return;
-  updateHusband(fam);
-  updateWife(fam);
-  localSons.value.forEach((son) => {
-    if (son.id.startsWith("temp-")) {
-      addNewPersonToFamily(fam, son.name, "Son", "male");
-    } else {
-      updatePersonName(son.id, son.name);
-    }
-  });
-  localDaughters.value.forEach((daughter) => {
-    if (daughter.id.startsWith("temp-")) {
-      addNewPersonToFamily(fam, daughter.name, "Daughter", "female");
-    } else {
-      updatePersonName(daughter.id, daughter.name);
-    }
-  });
-  fam.members = fam.members.filter(
-    (id) =>
-      localSons.value.some((son) => son.id === id) ||
-      localDaughters.value.some((daughter) => daughter.id === id) ||
-      id === fam.husbandId ||
-      id === fam.wifeId
-  );
+
+  // Update spouse information
+  updateHusband(fam); // should update fam.husbandId and the corresponding person record
+  updateWife(fam); // should update fam.wifeId and the corresponding person record
+
+  // Update sons and daughters arrays explicitly from your local form state.
+  // Assuming localSons and localDaughters are arrays of person objects.
+  fam.sons = localSons.value.map((son) => son.id);
+  fam.daughters = localDaughters.value.map((daughter) => daughter.id);
+
+  // If you still have any edge updates (or if you rebuild the chart), do them here.
   updateEdgeLabels(fam);
+
   isEditing.value = false;
-  loadFamily(props.familyData.id);
+  loadFamily(props.familyData.id); // reload the updated family details for the form
 }
 
-function updateEdgeLabels(family) {
-  family.members.forEach((memberId) => {
-    const edge = store.edges.find(
-      (e) =>
-        (e.data.source === memberId && e.data.target === family.id) ||
-        (e.data.target === memberId && e.data.source === family.id)
+function updateEdgeLabels(fam) {
+  // Update the spouse edges.
+  // For the husband edge, assume the edge was created with:
+  //   { source: fam.husbandId, target: fam.id, label: "Husband" }
+  if (fam.husbandId) {
+    const husbandEdge = this.edges.find(
+      (e) => e.data.source === fam.husbandId && e.data.target === fam.id
     );
-    if (edge) {
-      const person = store.persons.find((p) => p.id === memberId);
-      if (person) {
-        if (family.husbandId === person.id) {
-          edge.data.label =
-            localSons.value.length > 0 || localDaughters.value.length > 0
-              ? "Father"
-              : "Husband";
-        } else if (family.wifeId === person.id) {
-          edge.data.label =
-            localSons.value.length > 0 || localDaughters.value.length > 0
-              ? "Mother"
-              : "Wife";
-        }
+    if (husbandEdge) {
+      // If there are children, change the label to "Father"
+      if (
+        (fam.sons && fam.sons.length > 0) ||
+        (fam.daughters && fam.daughters.length > 0)
+      ) {
+        husbandEdge.data.label = "Father";
+      } else {
+        husbandEdge.data.label = "Husband";
       }
     }
-  });
+  }
+
+  // For the wife edge, assume the edge was created with:
+  //   { source: fam.wifeId, target: fam.id, label: "Wife" }
+  if (fam.wifeId) {
+    const wifeEdge = this.edges.find(
+      (e) => e.data.source === fam.wifeId && e.data.target === fam.id
+    );
+    if (wifeEdge) {
+      if (
+        (fam.sons && fam.sons.length > 0) ||
+        (fam.daughters && fam.daughters.length > 0)
+      ) {
+        wifeEdge.data.label = "Mother";
+      } else {
+        wifeEdge.data.label = "Wife";
+      }
+    }
+  }
+
+  // Update the child edges.
+  // For sons, assume the edge was created with:
+  //   { source: fam.id, target: childId, label: "Son" }
+  if (Array.isArray(fam.sons)) {
+    fam.sons.forEach((childId) => {
+      const sonEdge = this.edges.find(
+        (e) => e.data.source === fam.id && e.data.target === childId
+      );
+      if (sonEdge) {
+        sonEdge.data.label = "Son";
+      }
+    });
+  }
+
+  // For daughters, assume the edge was created with:
+  //   { source: fam.id, target: childId, label: "Daughter" }
+  if (Array.isArray(fam.daughters)) {
+    fam.daughters.forEach((childId) => {
+      const daughterEdge = this.edges.find(
+        (e) => e.data.source === fam.id && e.data.target === childId
+      );
+      if (daughterEdge) {
+        daughterEdge.data.label = "Daughter";
+      }
+    });
+  }
 }
 
 function updateHusband(fam) {
@@ -324,7 +345,7 @@ function updateHusband(fam) {
       addNewPersonToFamily(fam, localHusbandName.value, "Husband", "male");
     }
   } else if (fam.husbandId) {
-    fam.members = fam.members.filter((id) => id !== fam.husbandId);
+    // Remove the husband by simply clearing the husbandId
     fam.husbandId = null;
   }
 }
@@ -341,8 +362,33 @@ function updateWife(fam) {
       addNewPersonToFamily(fam, localWifeName.value, "Wife", "female");
     }
   } else if (fam.wifeId) {
-    fam.members = fam.members.filter((id) => id !== fam.wifeId);
+    // Simply clear the wifeId if no wife name is provided
     fam.wifeId = null;
+  }
+}
+
+function saveHusband() {
+  if (props.familyData && props.familyData.husbandId) {
+    const husband = store.persons.find(
+      (p) => p.id === props.familyData.husbandId
+    );
+    if (husband) {
+      husband.name = localHusbandName.value;
+      // Optionally update any graph node labels here.
+      console.log("Husband updated:", husband);
+    }
+    isEditing.value = false;
+  }
+}
+
+function saveWife() {
+  if (props.familyData && props.familyData.wifeId) {
+    const wife = store.persons.find((p) => p.id === props.familyData.wifeId);
+    if (wife) {
+      wife.name = localWifeName.value;
+      console.log("Wife updated:", wife);
+    }
+    isEditing.value = false;
   }
 }
 
@@ -365,16 +411,26 @@ function addNewPersonToFamily(fam, name, relation, gender) {
   store.nodes.push({
     data: { id: newPersonId, label: newPerson.name, gender },
   });
+
   if (relation === "Husband") {
     fam.husbandId = newPersonId;
   } else if (relation === "Wife") {
     fam.wifeId = newPersonId;
-  }
-  if (!fam.members.includes(newPersonId)) {
-    fam.members.push(newPersonId);
+  } else if (relation === "Son") {
+    if (!fam.sons) {
+      fam.sons = [];
+    }
+    fam.sons.push(newPersonId);
+  } else if (relation === "Daughter") {
+    if (!fam.daughters) {
+      fam.daughters = [];
+    }
+    fam.daughters.push(newPersonId);
   }
 
   // Determine edge direction:
+  // For children, the edge is from the family node to the child.
+  // For spouse relationships, the edge is from the new person to the family node.
   const isChild = relation === "Son" || relation === "Daughter";
   const edgeData = isChild
     ? { source: fam.id, target: newPersonId, label: relation }

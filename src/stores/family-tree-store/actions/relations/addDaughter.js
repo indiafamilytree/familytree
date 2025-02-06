@@ -1,20 +1,23 @@
-// stores/family-tree-store/actions/relations/addSon.js
+// stores/family-tree-store/actions/relations/addDaughter.js
 import { addFamilyAndEdges } from "../../utils/addFamilyAndEdges.js";
 import { renameSpouseEdgeToParentIfNeeded } from "../../utils/renameSpouseEdgeToParentIfNeeded.js";
 
 export function addDaughter(linkedPerson, newPerson, enableLogging) {
-  // 1) Actually add the child
+  // 1) Actually add the child.
+  // (Assuming addFamilyAndEdges is updated to work with your new model.)
   addFamilyAndEdges.call(this, linkedPerson, "Child", enableLogging);
 
-  // 2) Figure out which family we just modified. Usually, you can find it
-  //    by searching for a family that includes linkedPerson (the father or mother).
-  //    If you have "linkedFamilyId" in `newPerson`, you can use that directly.
+  // 2) Figure out which family we just modified.
+  const family = this.families.find(
+    (f) =>
+      f.husbandId === linkedPerson.id ||
+      f.wifeId === linkedPerson.id ||
+      (f.sons && f.sons.includes(linkedPerson.id)) ||
+      (f.daughters && f.daughters.includes(linkedPerson.id))
+  );
 
-  // Example: if addFamilyAndEdges assigned a `linkedFamilyId`,
-  // or if your store keeps track of it:
-  const family = this.families.find((f) => f.members.includes(linkedPerson.id));
   if (family) {
-    // rename spouse → father/mother if children exist
+    // Rename spouse edge to parent if children exist.
     renameSpouseEdgeToParentIfNeeded.call(this, family.id);
   }
 }

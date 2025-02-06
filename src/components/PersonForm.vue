@@ -21,23 +21,12 @@
           <option value="wife">Wife</option>
         </select>
       </div>
-      <div class="form-group">
-        <select v-model="linkedFamilyId" id="linkedFamilyId" class="form-input">
-          <option value="">Select Family (Optional)</option>
-          <option
-            v-for="family in families"
-            :key="family.id"
-            :value="family.id"
-          >
-            {{ family.id }}
-          </option>
-        </select>
-      </div>
+      <!-- Removed the linkedFamilyId select as persons will only link to families via familyLinks -->
       <div class="button-group">
         <BaseButton type="submit" variant="primary">Add Person</BaseButton>
-        <BaseButton @click="downloadJson" variant="inprogress"
-          >Download JSON</BaseButton
-        >
+        <BaseButton @click="downloadJson" variant="inprogress">
+          Download JSON
+        </BaseButton>
       </div>
       <div class="button-group">
         <BaseButton tag="label" variant="primary">
@@ -66,7 +55,7 @@ const families = computed(() => store.families);
 
 const name = ref("");
 const relation = ref("father");
-const linkedFamilyId = ref("");
+// removed linkedFamilyId because a person will not be directly linked to another person
 
 function addPerson() {
   let gender;
@@ -84,26 +73,17 @@ function addPerson() {
     gender = "female";
   }
 
-  let linkedPersonId = null;
-  if (linkedFamilyId.value) {
-    const linkedFamily = store.families.find(
-      (f) => f.id === linkedFamilyId.value
-    );
-    if (linkedFamily && linkedFamily.members.length > 0) {
-      linkedPersonId = linkedFamily.members[0];
-    }
-  }
-
+  // Create a person with an empty familyLinks array.
   store.addPerson({
     name: name.value,
     gender: gender,
-    relation: relation.value,
-    linkedPersonId: linkedPersonId,
+    relation: relation.value, // optionally store the relation if needed
+    familyLinks: [], // person starts with no family links
   });
 
+  // Reset form fields.
   name.value = "";
   relation.value = "father";
-  linkedFamilyId.value = "";
 }
 
 function downloadJson() {

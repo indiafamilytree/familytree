@@ -38,11 +38,9 @@ export function useFamilyForm() {
   function createImmediateFamily(person) {
     if (!person) return;
 
-    // (1) Create the family node & push to store
     let familyId = `family-${familyTreeStore.families.length + 1}`;
     familyTreeStore.families.push({
       id: familyId,
-      members: [person.id],
       husbandId: null,
       wifeId: null,
       sons: [],
@@ -52,6 +50,8 @@ export function useFamilyForm() {
       data: { id: familyId, label: "Family", isFamily: true },
     });
 
+    // Link the person to the family node.
+    // The label depends on the person's gender: if male, treat him as Husband; if female, as Wife.
     const role = person.gender === "male" ? "Husband" : "Wife";
     const alreadyLinked = familyTreeStore.edges.some(
       (e) => e.data.source === person.id && e.data.target === familyId
@@ -73,6 +73,7 @@ export function useFamilyForm() {
         id: spouseId,
         name: spouseName.value,
         gender: spouseGender,
+        familyLinks: [], // assuming persons use a familyLinks property if needed
       });
       familyTreeStore.nodes.push({
         data: { id: spouseId, label: spouseName.value, gender: spouseGender },
@@ -82,7 +83,7 @@ export function useFamilyForm() {
       });
     }
 
-    // (3) Update husband/wife IDs
+    // (3) Update husband/wife IDs explicitly
     const family = familyTreeStore.families.find((f) => f.id === familyId);
     if (person.gender === "male") {
       family.husbandId = person.id;
@@ -92,20 +93,30 @@ export function useFamilyForm() {
       if (spouseId) family.husbandId = spouseId;
     }
 
-    // (4) Add new sons and daughters
+    // (4) Add new sons and daughters.
+    // For each child entered in the form, call addPerson and then update the family's explicit arrays.
     newSons.value.forEach((son) => {
       familyTreeStore.addPerson({
         ...son,
         relation: "Son",
         linkedFamilyId: familyId,
+        familyLinks: [], // person starts with no familyLinks; they can be updated later if needed
       });
+      // Assume the new person is appended at the end of the persons array.
+      let newSonId =
+        familyTreeStore.persons[familyTreeStore.persons.length - 1].id;
+      family.sons.push(newSonId);
     });
     newDaughters.value.forEach((daughter) => {
       familyTreeStore.addPerson({
         ...daughter,
         relation: "Daughter",
         linkedFamilyId: familyId,
+        familyLinks: [],
       });
+      let newDaughterId =
+        familyTreeStore.persons[familyTreeStore.persons.length - 1].id;
+      family.daughters.push(newDaughterId);
     });
 
     // (5) If we actually have children, rename Husband → Father / Wife → Mother
@@ -149,6 +160,7 @@ export function useFamilyForm() {
         id: fatherId,
         name: fatherName.value,
         gender: "male",
+        familyLinks: [],
       });
       familyTreeStore.nodes.push({
         data: { id: fatherId, label: fatherName.value, gender: "male" },
@@ -161,17 +173,16 @@ export function useFamilyForm() {
         id: motherId,
         name: motherName.value,
         gender: "female",
+        familyLinks: [],
       });
       familyTreeStore.nodes.push({
         data: { id: motherId, label: motherName.value, gender: "female" },
       });
     }
 
-    // Create a new family
     const newFamilyId = `family-${familyTreeStore.families.length + 1}`;
     familyTreeStore.families.push({
       id: newFamilyId,
-      members: [],
       husbandId: fatherId,
       wifeId: motherId,
       sons: [],
@@ -181,25 +192,12 @@ export function useFamilyForm() {
       data: { id: newFamilyId, label: "Family", isFamily: true },
     });
 
-    // Add father and mother to the family members
-    if (fatherId)
-      familyTreeStore.families
-        .find((f) => f.id === newFamilyId)
-        .members.push(fatherId);
-    if (motherId)
-      familyTreeStore.families
-        .find((f) => f.id === newFamilyId)
-        .members.push(motherId);
-
-    // Add the person to the family members
-    if (
-      !familyTreeStore.families
-        .find((f) => f.id === newFamilyId)
-        .members.includes(person.id)
-    ) {
-      familyTreeStore.families
-        .find((f) => f.id === newFamilyId)
-        .members.push(person.id);
+    // Add the person as a child of this ancestral family.
+    const family = familyTreeStore.families.find((f) => f.id === newFamilyId);
+    if (person.gender === "male") {
+      family.sons.push(person.id);
+    } else {
+      family.daughters.push(person.id);
     }
 
     // Link the person as "Son" or "Daughter" from that family
@@ -211,7 +209,7 @@ export function useFamilyForm() {
       },
     });
 
-    // Link father and mother to the family
+    // Link father and mother to the family, if they exist
     if (fatherId) {
       familyTreeStore.edges.push({
         data: { source: fatherId, target: newFamilyId, label: "Father" },

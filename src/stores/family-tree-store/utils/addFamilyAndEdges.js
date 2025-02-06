@@ -1,34 +1,31 @@
-// family-tree-store/utils/addFamilyAndEdges.js
+// File: src/stores/family-tree-store/utils/addFamilyAndEdges.js
 
+// No need to find family by relation from a members array; always return null.
 function findFamilyForRelation(families, person, relation) {
-  //   if (relation === "Spouse") {
-  //     return families.find((f) => f.members.includes(person.id));
-  //   } else if (relation === "Child") {
-  //     return families.find((f) => f.members.includes(person.id));
-  //   } else {
-  //     // For Father, Mother, or initial person creation
-  //     return null;
-  //   }
-  // No need to find family here anymore.
   return null;
 }
 
+// Create a new family object with explicit fields.
 function createFamily(families) {
   const familyId = `family-${families.length + 1}`;
   const family = {
     id: familyId,
-    members: [], // Store all family members (parents and children)
+    husbandId: null,
+    wifeId: null,
+    sons: [],
+    daughters: [],
   };
   return family;
 }
 
+// Previously used to update a combined members array; no longer needed.
+// We'll make this a no-op or remove it entirely.
 function updateFamily(family, person) {
-  // Fixed this to just add the person to the family
-  if (!family.members.includes(person.id)) {
-    family.members.push(person.id);
-  }
+  // With the new model, family composition is maintained via explicit fields.
+  // This function can be left as a no-op.
 }
 
+// Update the family node label (remains unchanged).
 function updateFamilyNodeLabel(nodes, familyId) {
   const familyNode = nodes.find((n) => n.data.id === familyId);
   if (familyNode) {
@@ -36,6 +33,7 @@ function updateFamilyNodeLabel(nodes, familyId) {
   }
 }
 
+// Add an edge if one with the same source, target, and label does not exist.
 function addEdges(edges, source, target, label, enableLogging) {
   if (
     !edges.some(
@@ -52,10 +50,11 @@ function addEdges(edges, source, target, label, enableLogging) {
   }
 }
 
+// Create edges for the given relation using explicit configuration.
 function createEdgesForRelation(family, person, relation, addEdgeFunc) {
   const familyNodeId = family.id;
 
-  // Define edge types with consistent source and target directions
+  // Define edge types with consistent source and target directions.
   const edgeTypes = {
     Husband: { personToFamily: "Husband", from: "person", to: "family" },
     Wife: { personToFamily: "Wife", from: "person", to: "family" },
@@ -75,6 +74,16 @@ function createEdgesForRelation(family, person, relation, addEdgeFunc) {
   }
 }
 
+/**
+ * addFamilyAndEdges: Adds a person to a family (or creates a new family) and
+ * adds corresponding edges.
+ *
+ * Parameters:
+ *  - person: The person object to be added.
+ *  - relation: The relation string (e.g. "Husband", "Wife", "Son", "Daughter", etc.).
+ *  - enableLogging: If true, logs debug information.
+ *  - linkedFamilyId: (Optional) If provided, attempts to use that family.
+ */
 export function addFamilyAndEdges(
   person,
   relation,
@@ -89,17 +98,18 @@ export function addFamilyAndEdges(
 
   let existingFamily = null;
 
-  // Find the family by linkedFamilyId
+  // Find the family by linkedFamilyId if provided.
   if (linkedFamilyId) {
     existingFamily = this.families.find((f) => f.id === linkedFamilyId);
   }
 
-  // If no existing family and the relation is not Husband or Wife, find family the person belongs to
+  // If no existing family and the relation is not Husband or Wife, try to find one.
+  // With the new model, we always return null.
   if (!existingFamily && relation !== "Husband" && relation !== "Wife") {
     existingFamily = findFamilyForRelation(this.families, person, relation);
   }
 
-  // Create a new family if no existing family is found
+  // Create a new family if no existing family is found.
   if (!existingFamily) {
     existingFamily = createFamily(this.families);
     this.families.push(existingFamily);
@@ -117,11 +127,16 @@ export function addFamilyAndEdges(
     console.log("    Existing family found:", existingFamily);
   }
 
-  // Update family members
-  updateFamily(existingFamily, person);
+  // Update family node label.
   updateFamilyNodeLabel(this.nodes, existingFamily.id);
 
-  // Add edges
+  // (Optional) Update the family explicit fields.
+  // In the new model, updating the family with the person is handled by the caller
+  // (for example, when adding a child or spouse, you update the relevant field).
+  // Here we call updateFamily (currently a no-op) for backward compatibility.
+  updateFamily(existingFamily, person);
+
+  // Add edges.
   const addEdgeFunc = (source, target, label) =>
     addEdges(this.edges, source, target, label, enableLogging);
 
