@@ -268,15 +268,37 @@ function saveChanges() {
   const fam = store.families.find((f) => f.id === props.familyData.id);
   if (!fam) return;
 
-  // Update spouse information
+  // Update spouse information.
   updateHusband(fam);
   updateWife(fam);
 
-  // Update sons and daughters arrays explicitly from your local form state.
+  // Process new sons: for any son with a temporary ID, create a permanent person.
+  const permanentSons = localSons.value.map((son) => {
+    if (son.id.startsWith("temp-")) {
+      // Create a permanent person for the new son.
+      addNewPersonToFamily(fam, son.name, "Son", "male");
+      // Return the newly created person (assumed to be the last person added)
+      return store.persons[store.persons.length - 1];
+    }
+    return son;
+  });
+  // Update localSons with permanent entries.
+  localSons.value = permanentSons;
+  // Update the family's sons array with the permanent IDs.
   fam.sons = localSons.value.map((son) => son.id);
+
+  // Process new daughters similarly.
+  const permanentDaughters = localDaughters.value.map((daughter) => {
+    if (daughter.id.startsWith("temp-")) {
+      addNewPersonToFamily(fam, daughter.name, "Daughter", "female");
+      return store.persons[store.persons.length - 1];
+    }
+    return daughter;
+  });
+  localDaughters.value = permanentDaughters;
   fam.daughters = localDaughters.value.map((daughter) => daughter.id);
 
-  // Remove extraneous child edges
+  // Remove extraneous child edges (if any) that no longer match the updated arrays.
   store.edges = store.edges.filter((edge) => {
     if (edge.data.source === fam.id && edge.data.label === "Son") {
       return fam.sons.includes(edge.data.target);
@@ -290,7 +312,7 @@ function saveChanges() {
   updateEdgeLabels(fam);
 
   isEditing.value = false;
-  loadFamily(props.familyData.id);
+  loadFamily(props.familyData.id); // Reload the updated family details for the form.
 }
 
 function updateEdgeLabels(fam) {
