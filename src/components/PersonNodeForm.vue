@@ -2,7 +2,14 @@
 <template>
   <div class="person-node-form">
     <!-- Family Option at the Top -->
-    <div class="options-top">
+    <div
+      class="options-top"
+      v-if="
+        !awaitSecondPerson &&
+        !showImmediateFamilyForm &&
+        !showAncestralFamilyForm
+      "
+    >
       <label class="options-label">Family Option:</label>
       <select
         v-model="selectedFamilyOption"
@@ -16,7 +23,7 @@
       </select>
     </div>
 
-    <!-- When awaiting second person selection -->
+    <!-- When awaiting a second person selection -->
     <div v-if="awaitSecondPerson" class="form-section">
       <h4>Family with Existing Node</h4>
       <p>Please select a second person from the chart.</p>
@@ -106,7 +113,6 @@
         <label>Mother Name:</label>
         <input type="text" v-model="motherName" />
       </div>
-
       <div class="button-group">
         <BaseButton @click="confirmAncestralFamily" variant="primary"
           >Create Ancestral Family</BaseButton
@@ -118,9 +124,11 @@
 </template>
 
 <script setup>
-import { ref, defineProps, defineEmits } from "vue";
+import { ref, defineProps, defineEmits, onMounted, onUnmounted } from "vue";
 import { useFamilyForm } from "@/composables/useFamilyForm";
 import BaseButton from "@/components/BaseButton.vue";
+import { useFamilyTreeStore } from "@/stores/family-tree-store/index";
+const store = useFamilyTreeStore();
 
 const props = defineProps({
   personData: { type: Object, required: true },
@@ -144,39 +152,48 @@ const {
   resetForm,
 } = useFamilyForm();
 
-// New state for the dropdown and for awaiting second person selection
+// New state for the dropdown and for awaiting second person selection.
 const selectedFamilyOption = ref("");
 const awaitSecondPerson = ref(false);
 const showImmediateFamilyForm = ref(false);
 const showAncestralFamilyForm = ref(false);
 
 function handleOptionSelection() {
+  console.log("Dropdown changed, value:", selectedFamilyOption.value);
   if (selectedFamilyOption.value === "immediate") {
     showImmediateFamilyForm.value = true;
     showAncestralFamilyForm.value = false;
     awaitSecondPerson.value = false;
+    window.awaitSecondPerson = false;
+    console.log("Immediate Family option selected.");
   } else if (selectedFamilyOption.value === "ancestral") {
     showAncestralFamilyForm.value = true;
     showImmediateFamilyForm.value = false;
     awaitSecondPerson.value = false;
+    window.awaitSecondPerson = false;
+    console.log("Ancestral Family option selected.");
   } else if (selectedFamilyOption.value === "existing") {
     awaitSecondPerson.value = true;
-    // Notify the parent or chart that we're awaiting a second person selection.
+    window.awaitSecondPerson = true; // Set the global flag for FamilyChart to detect.
     emit("await-second-person", true);
-    // Hide the dropdown while waiting.
     showImmediateFamilyForm.value = false;
     showAncestralFamilyForm.value = false;
+    console.log(
+      "Family with Existing Node option selected. Awaiting second person selection."
+    );
   }
 }
 
 function cancelExistingFamily() {
+  console.log("Cancel existing family option.");
   awaitSecondPerson.value = false;
+  window.awaitSecondPerson = false; // Reset global flag.
   emit("await-second-person", false);
-  // Reset dropdown selection to prompt again.
   selectedFamilyOption.value = "";
 }
 
 function confirmImmediateFamily() {
+  console.log("Confirming immediate family for", props.personData);
   createImmediateFamily(props.personData);
   emit("update:personData", { ...props.personData });
   emit("close");
@@ -185,6 +202,7 @@ function confirmImmediateFamily() {
 }
 
 function confirmAncestralFamily() {
+  console.log("Confirming ancestral family for", props.personData);
   createAncestralFamily(props.personData);
   emit("update:personData", { ...props.personData });
   emit("close");
@@ -193,12 +211,92 @@ function confirmAncestralFamily() {
 }
 
 function cancel() {
+  console.log("Cancel family form.");
   showImmediateFamilyForm.value = false;
   showAncestralFamilyForm.value = false;
   selectedFamilyOption.value = "";
   resetForm();
   emit("close");
 }
+
+// Global event listener for second person selection.
+function secondPersonEventHandler(e) {
+  console.log("Received 'second-person-selected' event with detail:", e.detail);
+  if (awaitSecondPerson.value && e.detail) {
+    onSecondPersonSelected(e.detail);
+  } else {
+    console.log("Not awaiting second person selection or no detail provided.");
+  }
+}
+
+function onSecondPersonSelected(secondPerson) {
+  console.log("Second person selected:", secondPerson);
+  createFamilyFromNodes(props.personData, secondPerson);
+  awaitSecondPerson.value = false;
+  window.awaitSecondPerson = false; // Reset global flag.
+  emit("await-second-person", false);
+  emit("close");
+  resetForm();
+}
+
+// Example function: Create a family node from two person nodes.
+function createFamilyFromNodes(person1, person2) {
+  let husbandId, wifeId;
+  if (person1.gender === "male" && person2.gender === "female") {
+    husbandId = person1.id;
+    wifeId = person2.id;
+  } else if (person1.gender === "female" && person2.gender === "male") {
+    husbandId = person2.id;
+    wifeId = person1.id;
+  } else {
+    // For same-gender cases, assign arbitrarily (or add custom logic)
+    husbandId = person1.id;
+    wifeId = person2.id;
+  }
+  const familyId = `family-${Date.now()}`;
+  const newFamily = {
+    id: familyId,
+    husbandId,
+    wifeId,
+    sons: [],
+    daughters: [],
+  };
+
+  // Push the new family into the store
+  store.families.push(newFamily);
+  console.log("New family created from nodes:", newFamily);
+
+  // Add a family node so that it appears in the chart
+  store.nodes.push({
+    data: { id: familyId, label: "Family", isFamily: true },
+  });
+
+  // Create edges for the spouses
+  store.edges.push({
+    data: { source: husbandId, target: familyId, label: "Husband" },
+  });
+  store.edges.push({
+    data: { source: wifeId, target: familyId, label: "Wife" },
+  });
+
+  // If your chart is reactive (watching store.families/nodes/edges), it should now update automatically.
+}
+
+onMounted(() => {
+  console.log(
+    "PersonNodeForm mounted, adding event listener for 'second-person-selected'"
+  );
+  window.addEventListener("second-person-selected", secondPersonEventHandler);
+});
+onUnmounted(() => {
+  console.log(
+    "PersonNodeForm unmounted, removing event listener for 'second-person-selected'"
+  );
+  window.removeEventListener(
+    "second-person-selected",
+    secondPersonEventHandler
+  );
+});
 </script>
 
 <style scoped>
@@ -209,8 +307,6 @@ function cancel() {
   background-color: #f9f9f9;
   font-family: sans-serif;
 }
-
-/* Dropdown styling */
 .options-top {
   display: flex;
   flex-direction: column;
@@ -228,8 +324,6 @@ function cancel() {
   width: 100%;
   max-width: 250px;
 }
-
-/* Form section styling */
 .form-section {
   margin-bottom: 15px;
 }

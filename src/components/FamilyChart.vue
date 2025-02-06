@@ -226,7 +226,18 @@ const initializeChart = () => {
 
   cy.value.on("tap", "node", (event) => {
     const node = event.target;
-    emit("node-selected", node.data());
+    const nodeData = node.data();
+    console.log("Node tapped:", nodeData);
+
+    // Check if this is a person node (assuming family nodes have isFamily: true)
+    if (!nodeData.isFamily && window.awaitSecondPerson) {
+      console.log("Dispatching 'second-person-selected' event for:", nodeData);
+      window.dispatchEvent(
+        new CustomEvent("second-person-selected", { detail: nodeData })
+      );
+    } else {
+      emit("node-selected", nodeData);
+    }
   });
 
   cy.value.on("cxttap", "node", (event) => {
