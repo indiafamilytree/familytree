@@ -15,11 +15,14 @@
 <script setup>
 import cytoscape from "cytoscape";
 import dagre from "cytoscape-dagre";
-import { onMounted, ref, watch } from "vue";
+import panzoom from "cytoscape-panzoom";
+import { onMounted, ref, watch, defineEmits } from "vue";
 import { useFamilyTreeStore } from "@/stores/family-tree-store/index";
 import BaseButton from "@/components/BaseButton.vue";
 
+// Register dagre and panzoom with Cytoscape.
 cytoscape.use(dagre);
+cytoscape.use(panzoom);
 
 const familyTreeStore = useFamilyTreeStore();
 const cy = ref(null);
@@ -32,6 +35,23 @@ onMounted(() => {
       gender: "male",
     });
   }
+
+  initializeChart();
+
+  // Set up a watcher so that changes in store nodes/edges trigger a chart update.
+  watch(
+    () => [familyTreeStore.nodes, familyTreeStore.edges],
+    (newValues) => {
+      if (cy.value) {
+        cy.value.elements().remove();
+        cy.value.add([...familyTreeStore.nodes, ...familyTreeStore.edges]);
+        cy.value.layout(layoutConfig).run();
+      } else {
+        initializeChart();
+      }
+    },
+    { deep: true }
+  );
 });
 
 const colorPalette = [
@@ -104,10 +124,10 @@ const layoutConfig = {
     }
     return 1;
   },
-  spacingFactor: 1.2,
-  nodeSep: 50,
-  edgeSep: 10,
-  rankSep: 100,
+  spacingFactor: 1.5, // Increase spacing factor
+  nodeSep: 100, // Increase node separation
+  edgeSep: 50, // Increase edge separation
+  rankSep: 150, // Increase rank separation
 };
 
 const styleConfig = [
@@ -200,8 +220,26 @@ const initializeChart = () => {
     elements: [...familyTreeStore.nodes, ...familyTreeStore.edges],
     layout: layoutConfig,
     style: styleConfig,
-    zoomingEnabled: false,
-    panningEnabled: true,
+    zoomingEnabled: true, // Allow zooming
+    panningEnabled: true, // Allow panning (if you want both, you can disable drag if desired)
+  });
+
+  // Initialize panzoom controls
+  cy.value.panzoom({
+    // Adjust options as needed:
+    zoomFactor: 0.05, // Incremental zoom factor
+    sliderMax: 10,
+    sliderMin: 1,
+    sliderHandleIcon: '<i class="fas fa-search-plus"></i>',
+    panButtonIcons: {
+      up: '<i class="fas fa-arrow-up"></i>',
+      down: '<i class="fas fa-arrow-down"></i>',
+      left: '<i class="fas fa-arrow-left"></i>',
+      right: '<i class="fas fa-arrow-right"></i>',
+    },
+    // You can customize positions and styles further.
+    showSlider: true,
+    showControls: true,
   });
 
   cy.value.layout(layoutConfig).run();
@@ -264,20 +302,6 @@ const initializeChart = () => {
     }
   });
 };
-
-watch(
-  () => [familyTreeStore.nodes, familyTreeStore.edges],
-  (newValues, oldValues) => {
-    if (cy.value) {
-      cy.value.elements().remove();
-      cy.value.add([...familyTreeStore.nodes, ...familyTreeStore.edges]);
-      cy.value.layout(layoutConfig).run();
-    } else {
-      initializeChart();
-    }
-  },
-  { deep: true }
-);
 
 onMounted(() => {
   initializeChart();
