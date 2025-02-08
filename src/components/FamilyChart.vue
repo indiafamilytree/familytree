@@ -12,20 +12,20 @@
         v-model="selectedLayout"
         @change="refreshLayout"
       >
+        <option value="compound">Compound Layout</option>
         <option value="coseBilkent">Cose Bilkent Layout</option>
         <option value="dagre">Dagre Layout</option>
         <option value="klay">Klay Layout</option>
-        <option value="compound">Compound Layout</option>
       </select>
     </div>
 
-    <!-- Export PNG button -->
+    <!-- Export SVG button -->
     <BaseButton
-      @click="exportAsHighResPNG"
+      @click="exportAsSVG"
       variant="primary"
       class="absolute top-4 right-4"
     >
-      Export as PNG (300 DPI)
+      Export as SVG
     </BaseButton>
 
     <!-- Manual refresh layout button -->
@@ -44,14 +44,16 @@ import cytoscape from "cytoscape";
 import dagre from "cytoscape-dagre";
 import klay from "cytoscape-klay";
 import coseBilkent from "cytoscape-cose-bilkent";
-import { onMounted, ref, watch, computed, defineEmits, nextTick } from "vue";
+import cytoscapeSVG from "cytoscape-svg"; // for SVG export
+import { onMounted, ref, watch, computed, defineEmits } from "vue";
 import { useFamilyTreeStore } from "@/stores/family-tree-store/index";
 import BaseButton from "@/components/BaseButton.vue";
 
-// Register layout extensions.
+// Register extensions.
 cytoscape.use(dagre);
 cytoscape.use(klay);
 cytoscape.use(coseBilkent);
+cytoscapeSVG(cytoscape); // Register the SVG export extension
 
 const familyTreeStore = useFamilyTreeStore();
 const cy = ref(null);
@@ -59,10 +61,28 @@ const emit = defineEmits(["node-selected"]);
 
 // --- Layout Configurations ---
 
+// Compound layout configuration (default)
+const compoundLayoutConfig = {
+  global: {
+    name: "dagre",
+    rankDir: "TB",
+    fit: false,
+    spacingFactor: 1.5,
+    nodeSep: 100,
+    edgeSep: 50,
+    rankSep: 150,
+  },
+  compound: {
+    name: "grid",
+    fit: false,
+    padding: 20,
+  },
+};
+
 // Cose-Bilkent layout configuration.
 const coseBilkentLayoutConfig = {
   name: "cose-bilkent",
-  fit: false, // Allow the graph to overflow.
+  fit: false,
   animate: true,
   animationDuration: 1000,
   idealEdgeLength: 250,
@@ -109,31 +129,10 @@ const klayLayoutConfig = {
   thoroughness: 20,
 };
 
-// For the compound layout, we will run two layouts:
-// (a) A global layout (using dagre) on the compound nodes (families)
-// (b) A secondary layout (using grid) on the children of each family node.
-const compoundLayoutConfig = {
-  global: {
-    name: "dagre",
-    rankDir: "TB",
-    fit: false,
-    spacingFactor: 1.5,
-    nodeSep: 100,
-    edgeSep: 50,
-    rankSep: 150,
-  },
-  compound: {
-    name: "grid",
-    fit: false,
-    padding: 20,
-    // You can adjust further options, e.g., number of rows if needed.
-  },
-};
+// Set default layout to compound.
+const selectedLayout = ref("compound");
 
-// Reactive variable for the selected layout.
-const selectedLayout = ref("coseBilkent");
-
-// Computed layout configuration for non-compound options.
+// Computed layout configuration for non-compound layouts.
 const currentLayoutConfig = computed(() => {
   switch (selectedLayout.value) {
     case "dagre":
@@ -141,8 +140,9 @@ const currentLayoutConfig = computed(() => {
     case "klay":
       return klayLayoutConfig;
     case "coseBilkent":
-    default:
       return coseBilkentLayoutConfig;
+    default:
+      return compoundLayoutConfig.global;
   }
 });
 
@@ -211,7 +211,7 @@ const styleConfig = [
 
 // --- Chart Initialization ---
 const initializeChart = () => {
-  // If no persons exist, initialize a hardcoded root person.
+  // Ensure a hardcoded root person exists.
   if (familyTreeStore.persons.length === 0) {
     familyTreeStore.initializeRootPerson({
       name: "Kannusamy",
@@ -222,8 +222,6 @@ const initializeChart = () => {
   cy.value = cytoscape({
     container: document.getElementById("cy"),
     elements: [...familyTreeStore.nodes, ...familyTreeStore.edges],
-    // For non-compound layouts, use currentLayoutConfig;
-    // for compound layout, we will run the global layout first and then a child layout.
     layout:
       selectedLayout.value === "compound"
         ? compoundLayoutConfig.global
@@ -235,19 +233,13 @@ const initializeChart = () => {
     userPanningEnabled: true,
   });
 
-  // Run the global layout.
-  cy.value
-    .layout(
-      selectedLayout.value === "compound"
-        ? compoundLayoutConfig.global
-        : currentLayoutConfig.value
-    )
-    .run();
-
-  // If using compound layout, run a secondary layout on the children of each compound node.
+  // Run the layout.
   if (selectedLayout.value === "compound") {
-    // Assuming that each family node is a compound node and its children are family members.
+    cy.value.layout(compoundLayoutConfig.global).run();
+    // Then run a secondary grid layout for compound node children.
     cy.value.nodes("[?parent]").layout(compoundLayoutConfig.compound).run();
+  } else {
+    cy.value.layout(currentLayoutConfig.value).run();
   }
 
   const centerOnRoot = () => {
@@ -273,7 +265,6 @@ const initializeChart = () => {
     const node = event.target;
     const nodeData = node.data();
     console.log("Node tapped:", nodeData);
-    // If the global flag for second-person selection is true and the node is a person, dispatch event.
     if (!nodeData.isFamily && window.awaitSecondPerson) {
       console.log("Dispatching 'second-person-selected' event for:", nodeData);
       window.dispatchEvent(
@@ -305,6 +296,7 @@ const initializeChart = () => {
   });
 };
 
+// --- Watcher for Store Changes ---
 watch(
   () => [familyTreeStore.nodes, familyTreeStore.edges],
   (newValues) => {
@@ -313,7 +305,6 @@ watch(
       cy.value.add([...familyTreeStore.nodes, ...familyTreeStore.edges]);
       if (selectedLayout.value === "compound") {
         cy.value.layout(compoundLayoutConfig.global).run();
-        // Then run secondary layout for compound node children.
         cy.value.nodes("[?parent]").layout(compoundLayoutConfig.compound).run();
       } else {
         cy.value.layout(currentLayoutConfig.value).run();
@@ -343,34 +334,24 @@ function refreshLayout() {
   }
 }
 
-// --- Export PNG Function ---
-function exportAsHighResPNG() {
-  const desiredWidthInches = 10;
-  const desiredHeightInches = 8;
-  const dpi = 300;
-  const desiredWidthPixels = desiredWidthInches * dpi;
-  const desiredHeightPixels = desiredHeightInches * dpi;
-  const bounds = cy.value.elements().boundingBox();
-  const currentWidth = bounds.w;
-  const currentHeight = bounds.h;
-  const scale = Math.max(
-    desiredWidthPixels / currentWidth,
-    desiredHeightPixels / currentHeight
-  );
-  const pngBlob = cy.value.png({
-    output: "blob",
-    bg: "transparent",
-    full: true,
-    scale: scale,
-  });
-  const url = URL.createObjectURL(pngBlob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = "family-tree.png";
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  URL.revokeObjectURL(url);
+// --- Export SVG Function ---
+// Export as SVG (scalable for all sizes)
+function exportAsSVG() {
+  try {
+    const svgStr = cy.value.svg({ output: "string", full: true });
+    const blob = new Blob([svgStr], { type: "image/svg+xml;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "family-tree.svg";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    console.log("SVG export successful.");
+  } catch (error) {
+    console.error("Error exporting SVG:", error);
+  }
 }
 </script>
 
