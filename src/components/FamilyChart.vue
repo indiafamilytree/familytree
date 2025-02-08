@@ -1,7 +1,24 @@
 <!-- ./components/FamilyChart.vue -->
 <template>
   <div class="relative w-full h-screen">
+    <!-- Cytoscape container -->
     <div id="cy" class="absolute top-0 left-0 w-full h-full bg-gray-100"></div>
+
+    <!-- Layout selection dropdown (top left) -->
+    <div class="layout-select">
+      <label for="layoutSelect">View:</label>
+      <select
+        id="layoutSelect"
+        v-model="selectedLayout"
+        @change="refreshLayout"
+      >
+        <option value="coseBilkent">Cose Bilkent Layout</option>
+        <option value="dagre">Dagre Layout</option>
+        <option value="klay">Klay Layout</option>
+      </select>
+    </div>
+
+    <!-- Export PNG button -->
     <BaseButton
       @click="exportAsHighResPNG"
       variant="primary"
@@ -9,7 +26,8 @@
     >
       Export as PNG (300 DPI)
     </BaseButton>
-    <!-- Manual refresh layout button at the bottom -->
+
+    <!-- Manual refresh layout button -->
     <BaseButton
       @click="refreshLayout"
       variant="secondary"
@@ -23,103 +41,46 @@
 <script setup>
 import cytoscape from "cytoscape";
 import dagre from "cytoscape-dagre";
-// panzoom is assumed to be part of the core (or registered globally), so no import here.
-import { onMounted, ref, watch, nextTick, defineEmits } from "vue";
+import klay from "cytoscape-klay";
+import coseBilkent from "cytoscape-cose-bilkent";
+import { onMounted, ref, watch, computed, defineEmits } from "vue";
 import { useFamilyTreeStore } from "@/stores/family-tree-store/index";
 import BaseButton from "@/components/BaseButton.vue";
 
-// Register dagre with Cytoscape.
+// Register the layout extensions.
 cytoscape.use(dagre);
+cytoscape.use(klay);
+cytoscape.use(coseBilkent);
 
 const familyTreeStore = useFamilyTreeStore();
 const cy = ref(null);
 const emit = defineEmits(["node-selected"]);
 
-onMounted(() => {
-  if (familyTreeStore.persons.length === 0) {
-    familyTreeStore.initializeRootPerson({
-      name: "Kannusamy",
-      gender: "male",
-    });
-  }
+// --- Layout Configurations ---
 
-  initializeChart();
+// Cose-Bilkent layout configuration (default)
+const coseBilkentLayoutConfig = {
+  name: "cose-bilkent",
+  fit: false, // Do not force the graph into the viewport.
+  animate: true,
+  animationDuration: 1000,
+  idealEdgeLength: 250, // Increase edge length to push nodes further apart.
+  nodeRepulsion: 12000, // Increase repulsive force between nodes.
+  gravity: 0.45, // Moderate gravity to help center the layout.
+  numIter: 16000, // Increase iterations for better convergence.
+  tile: true,
+  nodeDimensionsIncludeLabels: true,
+  padding: 300, // Additional spacing around the layout.
+  // Optionally, if supported, you might experiment with:
+  nodeSpacingFactor: 1.0,
+  edgeSpacingFactor: 1.0,
+};
 
-  // Set up a watcher so that changes in store nodes/edges trigger a chart update.
-  watch(
-    () => [familyTreeStore.nodes, familyTreeStore.edges],
-    (newValues) => {
-      if (cy.value) {
-        cy.value.elements().remove();
-        cy.value.add([...familyTreeStore.nodes, ...familyTreeStore.edges]);
-        cy.value.layout(layoutConfig).run();
-      } else {
-        initializeChart();
-      }
-    },
-    { deep: true }
-  );
-});
-
-const colorPalette = [
-  "#FF5733",
-  "#3498DB",
-  "#2ECC71",
-  "#F08080",
-  "#FFB6C1",
-  "#9370DB",
-  "#FFD700",
-  "#20B2AA",
-  "#D2691E",
-  "#2E8B57",
-  "#008080",
-  "#FF6347",
-  "#4682B4",
-  "#008B8B",
-  "#BDB76B",
-  "#556B2F",
-  "#8B008B",
-  "#7CFC00",
-  "#FA8072",
-  "#6A5ACD",
-  "#DAA520",
-  "#006400",
-  "#800000",
-  "#8FBC8F",
-  "#483D8B",
-  "#B22222",
-  "#2F4F4F",
-  "#FF7F50",
-  "#DC143C",
-  "#00CED1",
-  "#9400D3",
-  "#1E90FF",
-  "#B8860B",
-  "#00008B",
-  "#A9A9A9",
-  "#6B8E23",
-  "#FFA500",
-  "#FF4500",
-  "#DA70D6",
-  "#EEE8AA",
-  "#98FB98",
-  "#AFEEEE",
-  "#DB7093",
-  "#FFEFD5",
-  "#FFDAB9",
-  "#CD853F",
-  "#FFC0CB",
-  "#DDA0DD",
-  "#B0E0E6",
-  "#800080",
-];
-let colorIndex = 0;
-const edgeColorMap = new Map();
-
-const layoutConfig = {
+// Dagre layout configuration.
+const dagreLayoutConfig = {
   name: "dagre",
   rankDir: "TB",
-  fit: false, // Allow overflow; do not force-fit all nodes into the viewport.
+  fit: false,
   minLen: function (edge) {
     const label = edge.data("label");
     if (
@@ -128,7 +89,7 @@ const layoutConfig = {
       label === "Father" ||
       label === "Mother"
     ) {
-      return 0.5; // Bring spouse/parent nodes closer.
+      return 0.5;
     }
     return 1;
   },
@@ -138,6 +99,35 @@ const layoutConfig = {
   rankSep: 150,
 };
 
+// Klay layout configuration.
+const klayLayoutConfig = {
+  name: "klay",
+  direction: "TB",
+  fit: false,
+  spacingFactor: 1.2,
+  nodeSpacing: 70,
+  edgeSpacingFactor: 0.3,
+  borderSpacing: 30,
+  thoroughness: 20,
+};
+
+// Reactive variable for the selected layout.
+const selectedLayout = ref("coseBilkent");
+
+// Computed layout configuration based on selection.
+const currentLayoutConfig = computed(() => {
+  switch (selectedLayout.value) {
+    case "dagre":
+      return dagreLayoutConfig;
+    case "klay":
+      return klayLayoutConfig;
+    case "coseBilkent":
+    default:
+      return coseBilkentLayoutConfig;
+  }
+});
+
+// --- Style Configuration ---
 const styleConfig = [
   {
     selector: "node",
@@ -193,40 +183,27 @@ const styleConfig = [
       "text-background-color": "#fff",
       "text-background-shape": "roundrectangle",
       "text-background-padding": "2px",
-      "line-color": (ele) => {
-        const targetNode = ele.target();
-        if (targetNode.data("id").startsWith("family")) {
-          if (!edgeColorMap.has(ele.data("id"))) {
-            edgeColorMap.set(ele.data("id"), colorPalette[colorIndex]);
-            colorIndex = (colorIndex + 1) % colorPalette.length;
-          }
-          return edgeColorMap.get(ele.data("id"));
-        } else {
-          return targetNode.style("background-color");
-        }
-      },
-      "target-arrow-color": (ele) => {
-        const targetNode = ele.target();
-        if (targetNode.data("id").startsWith("family")) {
-          if (!edgeColorMap.has(ele.data("id"))) {
-            edgeColorMap.set(ele.data("id"), colorPalette[colorIndex]);
-            colorIndex = (colorIndex + 1) % colorPalette.length;
-          }
-          return edgeColorMap.get(ele.data("id"));
-        } else {
-          return targetNode.style("background-color");
-        }
-      },
+      "line-color": "#ccc",
+      "target-arrow-color": "#ccc",
       "target-arrow-shape": "triangle",
     },
   },
 ];
 
+// --- Chart Initialization ---
 const initializeChart = () => {
+  // If no persons exist, initialize a hardcoded root person.
+  if (familyTreeStore.persons.length === 0) {
+    familyTreeStore.initializeRootPerson({
+      name: "Kannusamy",
+      gender: "male",
+    });
+  }
+
   cy.value = cytoscape({
     container: document.getElementById("cy"),
     elements: [...familyTreeStore.nodes, ...familyTreeStore.edges],
-    layout: layoutConfig,
+    layout: currentLayoutConfig.value,
     style: styleConfig,
     zoomingEnabled: true,
     panningEnabled: true,
@@ -234,12 +211,8 @@ const initializeChart = () => {
     userPanningEnabled: true,
   });
 
-  // Since panzoom is part of the core (or already registered globally),
-  // we simply rely on the built-in zoom/pan features and on-screen controls.
-  // You may remove any explicit panzoom call.
-  // For example: cy.value.panzoom({...}) is omitted.
-
-  cy.value.layout(layoutConfig).run();
+  // Run the layout.
+  cy.value.layout(currentLayoutConfig.value).run();
 
   const centerOnRoot = () => {
     const rootNodeData = familyTreeStore.rootPerson;
@@ -259,12 +232,12 @@ const initializeChart = () => {
     centerOnRoot();
   });
 
+  // Node tap handler with secondary node event logic.
   cy.value.on("tap", "node", (event) => {
     const node = event.target;
     const nodeData = node.data();
     console.log("Node tapped:", nodeData);
-    // Check if this is a person node (assuming family nodes have isFamily: true)
-    // and if we are awaiting a second person selection.
+    // If the global flag for second-person selection is true and the node is a person, dispatch event.
     if (!nodeData.isFamily && window.awaitSecondPerson) {
       console.log("Dispatching 'second-person-selected' event for:", nodeData);
       window.dispatchEvent(
@@ -292,18 +265,18 @@ const initializeChart = () => {
     const newLabel = prompt("Edit Relation:", edge.data("label"));
     if (newLabel) {
       edge.data("label", newLabel);
-      // Optionally update store edge if necessary.
     }
   });
 };
 
+// --- Watcher for Store Changes ---
 watch(
   () => [familyTreeStore.nodes, familyTreeStore.edges],
-  (newValues, oldValues) => {
+  (newValues) => {
     if (cy.value) {
       cy.value.elements().remove();
       cy.value.add([...familyTreeStore.nodes, ...familyTreeStore.edges]);
-      cy.value.layout(layoutConfig).run();
+      cy.value.layout(currentLayoutConfig.value).run();
     } else {
       initializeChart();
     }
@@ -315,11 +288,16 @@ onMounted(() => {
   initializeChart();
 });
 
+// --- Manual Refresh Function ---
 function refreshLayout() {
-  console.log("Manual layout refresh triggered.");
-  cy.value.layout(layoutConfig).run();
+  console.log(
+    "Manual layout refresh triggered. Using layout:",
+    selectedLayout.value
+  );
+  cy.value.layout(currentLayoutConfig.value).run();
 }
 
+// --- Export PNG Function ---
 function exportAsHighResPNG() {
   const desiredWidthInches = 10;
   const desiredHeightInches = 8;
@@ -361,6 +339,26 @@ function exportAsHighResPNG() {
   height: 100%;
   background-color: #f9f9f9;
 }
+/* Layout selection dropdown styles */
+.layout-select {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 10;
+  background: #fff;
+  padding: 6px 10px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+}
+.layout-select label {
+  font-size: 0.9rem;
+  margin-right: 5px;
+}
+.layout-select select {
+  padding: 4px;
+  font-size: 0.9rem;
+}
+/* Manual refresh layout button styling */
 .layout-refresh-button {
   position: absolute;
   bottom: 20px;
