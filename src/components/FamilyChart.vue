@@ -15,6 +15,7 @@
         <option value="coseBilkent">Cose Bilkent Layout</option>
         <option value="dagre">Dagre Layout</option>
         <option value="klay">Klay Layout</option>
+        <option value="compound">Compound Layout</option>
       </select>
     </div>
 
@@ -43,11 +44,11 @@ import cytoscape from "cytoscape";
 import dagre from "cytoscape-dagre";
 import klay from "cytoscape-klay";
 import coseBilkent from "cytoscape-cose-bilkent";
-import { onMounted, ref, watch, computed, defineEmits } from "vue";
+import { onMounted, ref, watch, computed, defineEmits, nextTick } from "vue";
 import { useFamilyTreeStore } from "@/stores/family-tree-store/index";
 import BaseButton from "@/components/BaseButton.vue";
 
-// Register the layout extensions.
+// Register layout extensions.
 cytoscape.use(dagre);
 cytoscape.use(klay);
 cytoscape.use(coseBilkent);
@@ -58,22 +59,19 @@ const emit = defineEmits(["node-selected"]);
 
 // --- Layout Configurations ---
 
-// Cose-Bilkent layout configuration (default)
+// Cose-Bilkent layout configuration.
 const coseBilkentLayoutConfig = {
   name: "cose-bilkent",
-  fit: false, // Do not force the graph into the viewport.
+  fit: false, // Allow the graph to overflow.
   animate: true,
   animationDuration: 1000,
-  idealEdgeLength: 250, // Increase edge length to push nodes further apart.
-  nodeRepulsion: 12000, // Increase repulsive force between nodes.
-  gravity: 0.45, // Moderate gravity to help center the layout.
-  numIter: 16000, // Increase iterations for better convergence.
+  idealEdgeLength: 250,
+  nodeRepulsion: 12000,
+  gravity: 0.45,
+  numIter: 5000,
   tile: true,
   nodeDimensionsIncludeLabels: true,
-  padding: 300, // Additional spacing around the layout.
-  // Optionally, if supported, you might experiment with:
-  nodeSpacingFactor: 1.0,
-  edgeSpacingFactor: 1.0,
+  padding: 30,
 };
 
 // Dagre layout configuration.
@@ -111,10 +109,31 @@ const klayLayoutConfig = {
   thoroughness: 20,
 };
 
+// For the compound layout, we will run two layouts:
+// (a) A global layout (using dagre) on the compound nodes (families)
+// (b) A secondary layout (using grid) on the children of each family node.
+const compoundLayoutConfig = {
+  global: {
+    name: "dagre",
+    rankDir: "TB",
+    fit: false,
+    spacingFactor: 1.5,
+    nodeSep: 100,
+    edgeSep: 50,
+    rankSep: 150,
+  },
+  compound: {
+    name: "grid",
+    fit: false,
+    padding: 20,
+    // You can adjust further options, e.g., number of rows if needed.
+  },
+};
+
 // Reactive variable for the selected layout.
 const selectedLayout = ref("coseBilkent");
 
-// Computed layout configuration based on selection.
+// Computed layout configuration for non-compound options.
 const currentLayoutConfig = computed(() => {
   switch (selectedLayout.value) {
     case "dagre":
@@ -203,16 +222,33 @@ const initializeChart = () => {
   cy.value = cytoscape({
     container: document.getElementById("cy"),
     elements: [...familyTreeStore.nodes, ...familyTreeStore.edges],
-    layout: currentLayoutConfig.value,
+    // For non-compound layouts, use currentLayoutConfig;
+    // for compound layout, we will run the global layout first and then a child layout.
+    layout:
+      selectedLayout.value === "compound"
+        ? compoundLayoutConfig.global
+        : currentLayoutConfig.value,
     style: styleConfig,
     zoomingEnabled: true,
     panningEnabled: true,
-    zoom: 1.5, // Higher default zoom level.
+    zoom: 1.5,
     userPanningEnabled: true,
   });
 
-  // Run the layout.
-  cy.value.layout(currentLayoutConfig.value).run();
+  // Run the global layout.
+  cy.value
+    .layout(
+      selectedLayout.value === "compound"
+        ? compoundLayoutConfig.global
+        : currentLayoutConfig.value
+    )
+    .run();
+
+  // If using compound layout, run a secondary layout on the children of each compound node.
+  if (selectedLayout.value === "compound") {
+    // Assuming that each family node is a compound node and its children are family members.
+    cy.value.nodes("[?parent]").layout(compoundLayoutConfig.compound).run();
+  }
 
   const centerOnRoot = () => {
     const rootNodeData = familyTreeStore.rootPerson;
@@ -269,14 +305,19 @@ const initializeChart = () => {
   });
 };
 
-// --- Watcher for Store Changes ---
 watch(
   () => [familyTreeStore.nodes, familyTreeStore.edges],
   (newValues) => {
     if (cy.value) {
       cy.value.elements().remove();
       cy.value.add([...familyTreeStore.nodes, ...familyTreeStore.edges]);
-      cy.value.layout(currentLayoutConfig.value).run();
+      if (selectedLayout.value === "compound") {
+        cy.value.layout(compoundLayoutConfig.global).run();
+        // Then run secondary layout for compound node children.
+        cy.value.nodes("[?parent]").layout(compoundLayoutConfig.compound).run();
+      } else {
+        cy.value.layout(currentLayoutConfig.value).run();
+      }
     } else {
       initializeChart();
     }
@@ -294,7 +335,12 @@ function refreshLayout() {
     "Manual layout refresh triggered. Using layout:",
     selectedLayout.value
   );
-  cy.value.layout(currentLayoutConfig.value).run();
+  if (selectedLayout.value === "compound") {
+    cy.value.layout(compoundLayoutConfig.global).run();
+    cy.value.nodes("[?parent]").layout(compoundLayoutConfig.compound).run();
+  } else {
+    cy.value.layout(currentLayoutConfig.value).run();
+  }
 }
 
 // --- Export PNG Function ---
