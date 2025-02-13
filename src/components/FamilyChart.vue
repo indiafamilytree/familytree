@@ -214,7 +214,7 @@ const initializeChart = () => {
   // Ensure a hardcoded root person exists.
   if (familyTreeStore.persons.length === 0) {
     familyTreeStore.initializeRootPerson({
-      name: "Kannusamy",
+      name: "Marimuthu",
       gender: "male",
     });
   }
