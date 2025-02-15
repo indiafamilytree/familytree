@@ -1,4 +1,3 @@
-<!-- ./components/FamilyChart.vue -->
 <template>
   <div class="relative w-full h-screen">
     <!-- Cytoscape container -->
@@ -40,28 +39,28 @@
 </template>
 
 <script setup>
+import { onMounted, ref, watch, computed, defineEmits } from "vue";
 import cytoscape from "cytoscape";
 import dagre from "cytoscape-dagre";
 import klay from "cytoscape-klay";
 import coseBilkent from "cytoscape-cose-bilkent";
-import cytoscapeSVG from "cytoscape-svg"; // for SVG export
-import { onMounted, ref, watch, computed, defineEmits } from "vue";
+import cytoscapeSVG from "cytoscape-svg";
 import { useFamilyTreeStore } from "@/stores/family-tree-store/index";
 import BaseButton from "@/components/BaseButton.vue";
 
-// Register extensions.
+// Register Cytoscape extensions.
 cytoscape.use(dagre);
 cytoscape.use(klay);
 cytoscape.use(coseBilkent);
-cytoscapeSVG(cytoscape); // Register the SVG export extension
+cytoscapeSVG(cytoscape);
 
+const emit = defineEmits(["node-selected"]);
 const familyTreeStore = useFamilyTreeStore();
 const cy = ref(null);
-const emit = defineEmits(["node-selected"]);
+const selectedLayout = ref("compound");
 
 // --- Layout Configurations ---
 
-// Compound layout configuration (default)
 const compoundLayoutConfig = {
   global: {
     name: "dagre",
@@ -79,7 +78,6 @@ const compoundLayoutConfig = {
   },
 };
 
-// Cose-Bilkent layout configuration.
 const coseBilkentLayoutConfig = {
   name: "cose-bilkent",
   fit: false,
@@ -94,22 +92,18 @@ const coseBilkentLayoutConfig = {
   padding: 30,
 };
 
-// Dagre layout configuration.
 const dagreLayoutConfig = {
   name: "dagre",
   rankDir: "TB",
   fit: false,
-  minLen: function (edge) {
+  minLen: (edge) => {
     const label = edge.data("label");
-    if (
-      label === "Husband" ||
+    return label === "Husband" ||
       label === "Wife" ||
       label === "Father" ||
       label === "Mother"
-    ) {
-      return 0.5;
-    }
-    return 1;
+      ? 0.5
+      : 1;
   },
   spacingFactor: 1.5,
   nodeSep: 100,
@@ -117,22 +111,21 @@ const dagreLayoutConfig = {
   rankSep: 150,
 };
 
-// Klay layout configuration.
 const klayLayoutConfig = {
   name: "klay",
-  direction: "TB",
+  nodeDimensionsIncludeLabels: true,
   fit: false,
-  spacingFactor: 1.2,
-  nodeSpacing: 70,
-  edgeSpacingFactor: 0.3,
-  borderSpacing: 30,
-  thoroughness: 20,
+  spacingFactor: 1,
+  klay: {
+    direction: "DOWN",
+    spacing: 100, // Increase for larger gaps between layers
+    edgeSpacingFactor: 2, // Increase edge-based spacing
+    inLayerSpacingFactor: 2, // Increase spacing among siblings
+    borderSpacing: 100, // Extra margin around layout
+    thoroughness: 20,
+  },
 };
 
-// Set default layout to compound.
-const selectedLayout = ref("compound");
-
-// Computed layout configuration for non-compound layouts.
 const currentLayoutConfig = computed(() => {
   switch (selectedLayout.value) {
     case "dagre":
@@ -146,7 +139,71 @@ const currentLayoutConfig = computed(() => {
   }
 });
 
-// --- Style Configuration ---
+// --- Color Bank for Edges ---
+// Removed near-white colors to keep colors visible.
+const colorBank = [
+  "#e6194b",
+  "#3cb44b",
+  "#ffe119",
+  "#0082c8",
+  "#f58231",
+  "#911eb4",
+  "#46f0f0",
+  "#f032e6",
+  "#d2f53c",
+  "#fabebe",
+  "#008080",
+  "#e6beff",
+  "#aa6e28",
+  // Removed near-white: "#fffac8",
+  "#800000",
+  "#aaffc3",
+  "#808000",
+  "#ffd8b1",
+  "#000080",
+  "#808080",
+  "#FF1493",
+  "#00CED1",
+  "#ADFF2F",
+  "#FF8C00",
+  "#DA70D6",
+  "#7FFFD4",
+  "#D2691E",
+  "#FF4500",
+  "#2E8B57",
+  "#00FA9A",
+  "#4682B4",
+  "#D2B48C",
+  "#B0C4DE",
+  "#FF69B4",
+  "#CD5C5C",
+  "#66CDAA",
+  "#B22222",
+  "#8A2BE2",
+  "#5F9EA0",
+  "#FFA07A",
+  "#20B2AA",
+  "#87CEEB",
+  "#778899",
+  "#B0E0E6",
+  "#32CD32",
+  "#FF6347",
+  "#40E0D0",
+  "#EE82EE",
+  "#F5DEB3",
+  "#BC8F8F",
+];
+
+function assignEdgeColors() {
+  if (!cy.value) return;
+  const edges = cy.value.edges();
+  edges.forEach((edge, index) => {
+    const color = colorBank[index % colorBank.length];
+    edge.data("color", color);
+  });
+}
+
+// --- Cytoscape Style ---
 const styleConfig = [
   {
     selector: "node",
@@ -169,13 +226,7 @@ const styleConfig = [
         if (ele.data("id").startsWith("family")) {
           return "round-rectangle";
         }
-        if (ele.data("gender") === "male") {
-          return "round-rectangle";
-        }
-        if (ele.data("gender") === "female") {
-          return "ellipse";
-        }
-        return "round-rectangle";
+        return ele.data("gender") === "male" ? "round-rectangle" : "ellipse";
       },
       "text-wrap": "wrap",
       "text-max-width": "110px",
@@ -202,21 +253,18 @@ const styleConfig = [
       "text-background-color": "#fff",
       "text-background-shape": "roundrectangle",
       "text-background-padding": "2px",
-      "line-color": "#ccc",
-      "target-arrow-color": "#ccc",
+      "line-color": "data(color)",
+      "target-arrow-color": "data(color)",
       "target-arrow-shape": "triangle",
     },
   },
 ];
 
-// --- Chart Initialization ---
-const initializeChart = () => {
-  // Ensure a hardcoded root person exists.
+// --- Chart Initialization & Event Handling ---
+function initializeChart() {
+  // Ensure a root person exists.
   if (familyTreeStore.persons.length === 0) {
-    familyTreeStore.initializeRootPerson({
-      name: "Marimuthu",
-      gender: "male",
-    });
+    familyTreeStore.initializeRootPerson({ name: "Marimuthu", gender: "male" });
   }
 
   cy.value = cytoscape({
@@ -236,67 +284,47 @@ const initializeChart = () => {
   // Run the layout.
   if (selectedLayout.value === "compound") {
     cy.value.layout(compoundLayoutConfig.global).run();
-    // Then run a secondary grid layout for compound node children.
     cy.value.nodes("[?parent]").layout(compoundLayoutConfig.compound).run();
   } else {
     cy.value.layout(currentLayoutConfig.value).run();
   }
 
-  const centerOnRoot = () => {
-    const rootNodeData = familyTreeStore.rootPerson;
-    if (rootNodeData) {
-      const rootNode = cy.value.getElementById(rootNodeData.id);
-      if (rootNode.length > 0) {
-        cy.value.center(rootNode);
-      } else {
-        console.warn(`Root node with ID ${rootNodeData.id} not found.`);
-      }
-    } else {
-      console.warn("Root person is not set in the store.");
-    }
-  };
-
+  // Once layout is ready, assign colors and center on the root.
   cy.value.ready(() => {
+    assignEdgeColors();
     centerOnRoot();
   });
 
-  // Node tap handler with secondary node event logic.
+  // Node tap handler.
   cy.value.on("tap", "node", (event) => {
     const node = event.target;
     const nodeData = node.data();
     console.log("Node tapped:", nodeData);
+    // If awaiting second person selection, dispatch that event.
     if (!nodeData.isFamily && window.awaitSecondPerson) {
-      console.log("Dispatching 'second-person-selected' event for:", nodeData);
       window.dispatchEvent(
         new CustomEvent("second-person-selected", { detail: nodeData })
       );
     } else {
+      // Otherwise, emit a "node-selected" event so the side panel opens the appropriate form.
       emit("node-selected", nodeData);
     }
   });
 
-  cy.value.on("cxttap", "node", (event) => {
-    const node = event.target;
-    const newName = prompt("Edit Name:", node.data("label"));
-    if (newName) {
-      node.data("label", newName);
-      const storeNode = familyTreeStore.nodes.find(
-        (n) => n.data.id === node.data("id")
-      );
-      if (storeNode) storeNode.data.label = newName;
-    }
-  });
+  // Additional event handlers (e.g., right-click for editing) can be added here.
+}
 
-  cy.value.on("cxttap", "edge", (event) => {
-    const edge = event.target;
-    const newLabel = prompt("Edit Relation:", edge.data("label"));
-    if (newLabel) {
-      edge.data("label", newLabel);
+function centerOnRoot() {
+  const rootNodeData = familyTreeStore.rootPerson;
+  if (rootNodeData) {
+    const rootNode = cy.value.getElementById(rootNodeData.id);
+    if (rootNode.length > 0) {
+      cy.value.center(rootNode);
     }
-  });
-};
+  }
+}
 
-// --- Watcher for Store Changes ---
+// Watch for changes in the store to update the chart.
 watch(
   () => [familyTreeStore.nodes, familyTreeStore.edges],
   (newValues) => {
@@ -309,6 +337,7 @@ watch(
       } else {
         cy.value.layout(currentLayoutConfig.value).run();
       }
+      assignEdgeColors();
     } else {
       initializeChart();
     }
@@ -320,22 +349,18 @@ onMounted(() => {
   initializeChart();
 });
 
-// --- Manual Refresh Function ---
+// Manual refresh layout.
 function refreshLayout() {
-  console.log(
-    "Manual layout refresh triggered. Using layout:",
-    selectedLayout.value
-  );
   if (selectedLayout.value === "compound") {
     cy.value.layout(compoundLayoutConfig.global).run();
     cy.value.nodes("[?parent]").layout(compoundLayoutConfig.compound).run();
   } else {
     cy.value.layout(currentLayoutConfig.value).run();
   }
+  assignEdgeColors();
 }
 
-// --- Export SVG Function ---
-// Export as SVG (scalable for all sizes)
+// Export SVG function.
 function exportAsSVG() {
   try {
     const svgStr = cy.value.svg({ output: "string", full: true });
@@ -348,7 +373,6 @@ function exportAsSVG() {
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
-    console.log("SVG export successful.");
   } catch (error) {
     console.error("Error exporting SVG:", error);
   }
