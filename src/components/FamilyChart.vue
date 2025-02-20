@@ -26,15 +26,6 @@
     >
       Export as SVG
     </BaseButton>
-
-    <!-- Manual refresh layout button -->
-    <BaseButton
-      @click="refreshLayout"
-      variant="secondary"
-      class="layout-refresh-button"
-    >
-      Refresh Layout
-    </BaseButton>
   </div>
 </template>
 
@@ -264,7 +255,7 @@ const styleConfig = [
 function initializeChart() {
   // Ensure a root person exists.
   if (familyTreeStore.persons.length === 0) {
-    familyTreeStore.initializeRootPerson({ name: "Marimuthu", gender: "male" });
+    //  familyTreeStore.initializeRootPerson({ name: "Marimuthu", gender: "male" });
   }
 
   cy.value = cytoscape({
