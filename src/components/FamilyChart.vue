@@ -322,7 +322,7 @@ watch(
     if (newRoot && cy.value) {
       setTimeout(() => {
         centerOnRoot();
-      }, 100); // adjust delay as needed
+      }, 10); // adjust delay as needed
     }
   }
 );
