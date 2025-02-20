@@ -1,3 +1,4 @@
+<!-- filepath: /Users/nkannaiyan/Code/ChatGPTApps/FamilyTree/family-tree-app/src/components/FamilyChart.vue -->
 <template>
   <div class="relative w-full h-screen">
     <!-- Cytoscape container -->
@@ -314,6 +315,17 @@ function centerOnRoot() {
     }
   }
 }
+
+watch(
+  () => familyTreeStore.rootPerson,
+  (newRoot) => {
+    if (newRoot && cy.value) {
+      setTimeout(() => {
+        centerOnRoot();
+      }, 100); // adjust delay as needed
+    }
+  }
+);
 
 // Watch for changes in the store to update the chart.
 watch(
