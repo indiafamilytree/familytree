@@ -17,16 +17,39 @@
 </template>
 
 <script setup>
-import { ref, watch } from "vue";
+import { ref, watch, onMounted } from "vue";
 import FamilyChart from "@/components/FamilyChart.vue";
 import SidePanel from "@/components/SidePanel.vue";
 import { useFamilyTreeStore } from "@/stores/family-tree-store/index";
+import {
+  signInWithRedirect,
+  getCurrentUser,
+  fetchUserAttributes,
+} from "@aws-amplify/auth";
+import "aws-amplify/auth/enable-oauth-listener";
+import { Hub } from "aws-amplify/utils";
+
+Hub.listen("auth", async ({ payload }) => {
+  switch (payload.event) {
+    case "signInWithRedirect":
+      const user = await getCurrentUser();
+      const userAttributes = await fetchUserAttributes();
+      console.log({ user, userAttributes });
+      break;
+    case "signInWithRedirect_failure":
+      // handle sign in failure
+      console.log("redirect failure event", payload);
+      break;
+    case "customOAuthState":
+      const state = payload.data; // this will be customState provided on signInWithRedirect function
+      console.log(state);
+      break;
+  }
+});
 
 const selectedNodeData = ref(null);
 const familyChartRef = ref(null);
 const store = useFamilyTreeStore();
-
-// Define showSidePanel so that it is available in the template.
 const showSidePanel = ref(true);
 
 function selectNode(nodeData) {
@@ -45,6 +68,33 @@ watch(
     }
   }
 );
+
+onMounted(async () => {
+  // Check for OAuth callback parameters to avoid infinite redirect loops.
+  const params = new URLSearchParams(window.location.search);
+  if (params.has("code") || params.has("error")) {
+    console.log("Detected OAuth callback parameters; skipping redirect.");
+    return;
+  }
+
+  try {
+    // Use getCurrentUser() to check for an existing session.
+    const userInfo = await getCurrentUser();
+    if (!userInfo) {
+      console.log("No user session detected, redirecting to Google sign-in...");
+      await signInWithRedirect({ provider: "Google" });
+    } else {
+      console.log("User is already signed in:", userInfo);
+    }
+  } catch (error) {
+    console.error("Error checking user session:", error);
+    try {
+      await signInWithRedirect({ provider: "Google" });
+    } catch (signInError) {
+      console.error("Error during sign-in redirect:", signInError);
+    }
+  }
+});
 </script>
 
 <style>
