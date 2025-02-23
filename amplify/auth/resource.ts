@@ -13,6 +13,7 @@ export const auth = defineAuth({
           givenName: "given_name",
           familyName: "family_name",
           emailVerified: "email_verified",
+          gender: "genders",
         },
       },
       callbackUrls: ["http://localhost:5173/"],

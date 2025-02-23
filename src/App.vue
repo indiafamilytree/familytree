@@ -84,7 +84,9 @@ onMounted(async () => {
       console.log("No user session detected, redirecting to Google sign-in...");
       await signInWithRedirect({ provider: "Google" });
     } else {
-      console.log("User is already signed in:", userInfo);
+      const user = await getCurrentUser();
+      const userAttributes = await fetchUserAttributes();
+      console.log({ user, userAttributes });
     }
   } catch (error) {
     console.error("Error checking user session:", error);
