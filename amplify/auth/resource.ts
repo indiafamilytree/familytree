@@ -1,5 +1,4 @@
 import { defineAuth, secret } from "@aws-amplify/backend";
-import config from "../../config/config.js";
 
 export const auth = defineAuth({
   loginWith: {
@@ -17,8 +16,14 @@ export const auth = defineAuth({
           gender: "genders",
         },
       },
-      callbackUrls: config.callbackUrls,
-      logoutUrls: config.logoutUrls,
+      callbackUrls: [
+        "http://localhost:5173/",
+        "https://familytree.releasign.com",
+      ],
+      logoutUrls: [
+        "http://localhost:5174/",
+        "https://familytree.releasign.com",
+      ],
     },
   },
 });
