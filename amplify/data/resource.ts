@@ -1,4 +1,4 @@
-import { type ClientSchema, a, defineData } from '@aws-amplify/backend';
+import { type ClientSchema, a, defineData } from "@aws-amplify/backend";
 
 /*== STEP 1 ===============================================================
 The section below creates a Todo database table with a "content" field. Try
@@ -6,10 +6,38 @@ adding a new "isDone" field as a boolean. The authorization rule below
 specifies that any unauthenticated user can "create", "read", "update", 
 and "delete" any "Todo" records.
 =========================================================================*/
+
+// Model to create persons
+// Model to create families to hold the relationships
+
 const schema = a.schema({
-  Todo: a
+  Persons: a
     .model({
-      content: a.string(),
+      personId: a.string(),
+      firstName: a.string(),
+      gender: a.string(),
+      // Reference the join model via personId
+      families: a.hasMany("FamilyPerson", "personId"),
+    })
+    .authorization((allow) => [allow.guest()]),
+
+  Families: a
+    .model({
+      familyId: a.string(),
+      // Reference the join model via familyId
+      members: a.hasMany("FamilyPerson", "familyId"),
+    })
+    .authorization((allow) => [allow.guest()]),
+
+  FamilyPerson: a
+    .model({
+      familyId: a.string(),
+      personId: a.string(),
+      // role can be "parent" or "child"
+      role: a.string(),
+      // Define the relationships that correspond to the foreign keys
+      person: a.belongsTo("Persons", "personId"),
+      family: a.belongsTo("Families", "familyId"),
     })
     .authorization((allow) => [allow.guest()]),
 });
@@ -19,7 +47,7 @@ export type Schema = ClientSchema<typeof schema>;
 export const data = defineData({
   schema,
   authorizationModes: {
-    defaultAuthorizationMode: 'iam',
+    defaultAuthorizationMode: "iam",
   },
 });
 

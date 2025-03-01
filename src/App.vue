@@ -96,6 +96,8 @@ onMounted(async () => {
       console.error("Error during sign-in redirect:", signInError);
     }
   }
+  // Initialize tree from S3
+  await store.loadAmplifyDataFromS3();
 });
 </script>
 

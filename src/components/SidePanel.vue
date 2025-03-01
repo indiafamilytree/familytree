@@ -1,4 +1,4 @@
-<!-- ./components/SidePanel.vue -->
+<!-- ./src/components/SidePanel.vue -->
 <template>
   <div class="side-panel">
     <div class="main-content">
@@ -27,13 +27,7 @@
       <BaseButton @click="downloadTree" variant="inprogress">
         Download
       </BaseButton>
-      <BaseButton @click="triggerFileInput" variant="primary">
-        Import
-      </BaseButton>
-    </div>
-    <!-- Hidden file input wrapped in a div to keep it out of view -->
-    <div style="display: none">
-      <input id="importFileInput" type="file" @change="handleTreeImport" />
+      <BaseButton @click="saveTree" variant="primary"> Save </BaseButton>
     </div>
   </div>
 </template>
@@ -57,15 +51,6 @@ const store = useFamilyTreeStore();
 const selectedPerson = ref(null);
 const selectedFamily = ref(null);
 
-// Programmatically trigger the hidden file input.
-function triggerFileInput() {
-  const fileInput = document.getElementById("importFileInput");
-  if (fileInput) {
-    fileInput.click();
-  }
-}
-
-// Download the tree as JSON.
 function downloadTree() {
   const treeData = {
     persons: store.persons,
@@ -74,10 +59,8 @@ function downloadTree() {
     edges: store.edges,
     rootPerson: store.rootPerson,
   };
-
   const jsonStr = JSON.stringify(treeData, null, 2);
   const dataUrl = "data:text/json;charset=utf-8," + encodeURIComponent(jsonStr);
-
   const link = document.createElement("a");
   link.setAttribute("href", dataUrl);
   link.setAttribute("download", "family-tree.json");
@@ -86,26 +69,8 @@ function downloadTree() {
   document.body.removeChild(link);
 }
 
-// Handle the file import.
-function handleTreeImport(event) {
-  const file = event.target.files[0];
-  if (!file) return;
-  const reader = new FileReader();
-  reader.onload = (e) => {
-    try {
-      const importedTree = JSON.parse(e.target.result);
-      store.persons = importedTree.persons || [];
-      store.families = importedTree.families || [];
-      store.nodes = importedTree.nodes || [];
-      store.edges = importedTree.edges || [];
-      store.rootPerson = importedTree.rootPerson || null;
-      console.log("Imported family tree:", importedTree);
-    } catch (err) {
-      console.error("Failed to parse JSON:", err);
-    }
-  };
-  reader.readAsText(file);
-  event.target.value = "";
+function saveTree() {
+  store.saveTreeToS3();
 }
 
 watch(
@@ -141,6 +106,8 @@ function updatePerson(updatedPerson) {
 }
 
 function closePanel() {
+  // Optionally save on close as well.
+  store.saveTreeToS3();
   selectedPerson.value = null;
   selectedFamily.value = null;
   emit("close");
