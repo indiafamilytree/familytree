@@ -256,12 +256,13 @@ const styleConfig = [
 function initializeChart() {
   // Ensure a root person exists.
   if (familyTreeStore.persons.length === 0) {
-    //  familyTreeStore.initializeRootPerson({ name: "Marimuthu", gender: "male" });
+    // familyTreeStore.initializeRootPerson({ name: "Marimuthu", gender: "male" });
   }
 
   cy.value = cytoscape({
     container: document.getElementById("cy"),
     elements: [...familyTreeStore.nodes, ...familyTreeStore.edges],
+    // Use the selected layout configuration as defined.
     layout:
       selectedLayout.value === "compound"
         ? compoundLayoutConfig.global
@@ -281,10 +282,13 @@ function initializeChart() {
     cy.value.layout(currentLayoutConfig.value).run();
   }
 
-  // Once layout is ready, assign colors and center on the root.
+  // Once layout is ready, assign colors, center on root, and then fit the graph into the viewport.
   cy.value.ready(() => {
     assignEdgeColors();
     centerOnRoot();
+    // Optimize: Fit all elements into the container with 20px padding.
+    cy.value.fit(cy.value.elements(), 20);
+    console.log("Graph fitted to viewport.");
   });
 
   // Node tap handler.

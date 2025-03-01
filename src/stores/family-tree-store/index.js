@@ -6,6 +6,12 @@ import { initializeRootPerson } from "./actions/initializeRootPerson.js";
 import { addPerson } from "./actions/addPerson.js";
 import { importPersons } from "./actions/importPersons.js";
 import { addFamilyMembers } from "./actions/addFamilyMembers.js";
+import debug from "debug";
+
+// Create loggers for different parts.
+const logLoad = debug("familyTree:load");
+const logTransform = debug("familyTree:transform");
+const logSave = debug("familyTree:save");
 
 export const useFamilyTreeStore = defineStore("familyTree", {
   state: () => ({
@@ -22,99 +28,77 @@ export const useFamilyTreeStore = defineStore("familyTree", {
     addFamilyMembers,
     async loadAmplifyDataFromS3() {
       try {
-        console.log("[loadAmplifyDataFromS3] Starting load process.");
+        logLoad("Starting load process.");
         const user = await getCurrentUser();
-        console.log("[loadAmplifyDataFromS3] Current user:", user);
+        logLoad("Current user:", user);
         const attributes = await fetchUserAttributes();
-        console.log("[loadAmplifyDataFromS3] User attributes:", attributes);
+        logLoad("User attributes:", attributes);
         const userId = attributes.sub || "default";
-        console.log("[loadAmplifyDataFromS3] Using userId:", userId);
+        logLoad("Using userId:", userId);
         const path = `entity-files/${userId}/amplify-tree.json`;
-        console.log("[loadAmplifyDataFromS3] S3 path:", path);
+        logLoad("S3 path:", path);
 
-        // getUrl returns an object, so extract the URL string.
         const urlResult = await getUrl({
           path,
-          options: {
-            validateObjectExistence: true,
-          },
+          options: { validateObjectExistence: true },
         });
         const presignedUrl = urlResult.url;
-        console.log(
-          "[loadAmplifyDataFromS3] Obtained presigned URL:",
-          presignedUrl
-        );
+        logLoad("Obtained presigned URL:", presignedUrl);
 
         const response = await fetch(presignedUrl);
-        console.log(
-          "[loadAmplifyDataFromS3] Fetch response status:",
-          response.status
-        );
+        logLoad("Fetch response status:", response.status);
         if (!response.ok) {
           throw new Error(`Failed to fetch file, status: ${response.status}`);
         }
         const text = await response.text();
-        console.log("[loadAmplifyDataFromS3] File content received:", text);
-
-        // Check if the content looks like HTML.
+        logLoad("File content received:", text);
         if (text.trim().startsWith("<!DOCTYPE")) {
-          console.warn(
-            "[loadAmplifyDataFromS3] File does not exist or returned HTML. Using default empty tree."
+          logLoad(
+            "File does not exist or returned HTML. Using default empty tree."
           );
-          return; // Optionally initialize with an empty tree.
+          return;
         }
         const amplifyData = JSON.parse(text);
-        console.log(
-          "[loadAmplifyDataFromS3] Parsed Amplify data:",
-          amplifyData
-        );
+        logLoad("Parsed Amplify data:", amplifyData);
         this.transformAmplifyDataToStore(amplifyData);
-        console.log(
-          "[loadAmplifyDataFromS3] Amplify data loaded and transformed successfully."
-        );
+        logLoad("Amplify data loaded and transformed successfully.");
       } catch (error) {
-        console.error(
-          "[loadAmplifyDataFromS3] Error loading Amplify data from S3:",
-          error
-        );
+        logLoad("Error loading Amplify data from S3:", error);
       }
     },
     transformAmplifyDataToStore(amplifyData) {
-      console.log("[transformAmplifyDataToStore] Starting transformation.");
-      // Map Amplify Persons using the actual keys (id, name, gender)
+      logTransform("Starting transformation.");
+      // Map Persons using actual keys.
       const persons = amplifyData.Persons.map((p) => ({
-        id: p.id, // instead of p.personId
-        name: p.name, // instead of p.firstName
+        id: p.id, // using 'id'
+        name: p.name, // using 'name'
         gender: p.gender,
       }));
-      console.log("[transformAmplifyDataToStore] Mapped persons:", persons);
+      logTransform("Mapped persons:", persons);
       const personNodes = persons.map((p) => ({
         data: { id: p.id, label: p.name, gender: p.gender },
       }));
 
-      // Map Amplify Families (adjust keys if needed)
+      // Map Families (adjust keys if necessary)
       const families = amplifyData.Families.map((f) => ({
-        id: f.id || f.familyId, // use f.id if available, or fallback to f.familyId
+        id: f.id || f.familyId,
         husbandId: null,
         wifeId: null,
         sons: [],
         daughters: [],
       }));
-      console.log("[transformAmplifyDataToStore] Mapped families:", families);
+      logTransform("Mapped families:", families);
       const familyNodes = families.map((f) => ({
         data: { id: f.id, label: "Family", isFamily: true },
       }));
 
-      // Build edges from the FamilyPerson join table.
+      // Build edges from FamilyPerson join table.
       const edges = amplifyData.FamilyPerson.map((fp) => {
         const person = persons.find(
           (p) => p.id === fp.personId || p.id === fp.person
         );
         if (!person) {
-          console.warn(
-            "[transformAmplifyDataToStore] No person found for record:",
-            fp
-          );
+          logTransform("No person found for record:", fp);
           return;
         }
         if (fp.role === "parent") {
@@ -137,9 +121,8 @@ export const useFamilyTreeStore = defineStore("familyTree", {
           };
         }
       }).filter((e) => e !== undefined);
-      console.log("[transformAmplifyDataToStore] Built edges:", edges);
+      logTransform("Built edges:", edges);
 
-      // Update each family object based on FamilyPerson records.
       amplifyData.FamilyPerson.forEach((fp) => {
         const person = persons.find(
           (p) => p.id === fp.personId || p.id === fp.person
@@ -162,9 +145,9 @@ export const useFamilyTreeStore = defineStore("familyTree", {
           }
         }
       });
-      console.log("[transformAmplifyDataToStore] Updated families:", families);
+      logTransform("Updated families:", families);
 
-      // Update the store state.
+      // Update store state.
       this.persons = persons;
       this.families = families;
       this.nodes = [...personNodes, ...familyNodes];
@@ -172,17 +155,17 @@ export const useFamilyTreeStore = defineStore("familyTree", {
       if (persons.length > 0) {
         this.rootPerson = persons[0];
       }
-      console.log("[transformAmplifyDataToStore] Store state updated.");
+      logTransform("Store state updated.");
     },
     async saveTreeToS3() {
       try {
-        console.log("[saveTreeToS3] Starting save process.");
+        logSave("Starting save process.");
         const user = await getCurrentUser();
         const attributes = await fetchUserAttributes();
         const userId = attributes.sub || "default";
-        console.log("[saveTreeToS3] Using userId:", userId);
+        logSave("Using userId:", userId);
         const path = `entity-files/${userId}/amplify-tree.json`;
-        console.log("[saveTreeToS3] S3 path:", path);
+        logSave("S3 path:", path);
 
         const familyPersons = this.edges.map((edge) => {
           if (edge.data.source.startsWith("person")) {
@@ -204,7 +187,7 @@ export const useFamilyTreeStore = defineStore("familyTree", {
           Families: this.families,
           FamilyPerson: familyPersons,
         };
-        console.log("[saveTreeToS3] Amplify data to save:", amplifyData);
+        logSave("Amplify data to save:", amplifyData);
         const file = new Blob([JSON.stringify(amplifyData)], {
           type: "application/json",
         });
@@ -212,9 +195,9 @@ export const useFamilyTreeStore = defineStore("familyTree", {
           path,
           data: file,
         }).result;
-        console.log("[saveTreeToS3] Succeeded: ", result);
+        logSave("Succeeded:", result);
       } catch (error) {
-        console.error("[saveTreeToS3] Error saving family tree to S3:", error);
+        logSave("Error saving family tree to S3:", error);
       }
     },
   },
