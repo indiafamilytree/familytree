@@ -8,7 +8,6 @@ import { importPersons } from "./actions/importPersons.js";
 import { addFamilyMembers } from "./actions/addFamilyMembers.js";
 import debug from "debug";
 
-// Create loggers for different parts.
 const logLoad = debug("familyTree:load");
 const logTransform = debug("familyTree:transform");
 const logSave = debug("familyTree:save");
@@ -68,10 +67,10 @@ export const useFamilyTreeStore = defineStore("familyTree", {
     },
     transformAmplifyDataToStore(amplifyData) {
       logTransform("Starting transformation.");
-      // Map Persons using actual keys.
+      // Map Persons using the actual keys.
       const persons = amplifyData.Persons.map((p) => ({
-        id: p.id, // using 'id'
-        name: p.name, // using 'name'
+        id: p.id, // expecting "id"
+        name: p.name, // expecting "name"
         gender: p.gender,
       }));
       logTransform("Mapped persons:", persons);
@@ -79,7 +78,7 @@ export const useFamilyTreeStore = defineStore("familyTree", {
         data: { id: p.id, label: p.name, gender: p.gender },
       }));
 
-      // Map Families (adjust keys if necessary)
+      // Map Families using either "id" or "familyId".
       const families = amplifyData.Families.map((f) => ({
         id: f.id || f.familyId,
         husbandId: null,
@@ -92,7 +91,7 @@ export const useFamilyTreeStore = defineStore("familyTree", {
         data: { id: f.id, label: "Family", isFamily: true },
       }));
 
-      // Build edges from FamilyPerson join table.
+      // Build edges from the FamilyPerson join table.
       const edges = amplifyData.FamilyPerson.map((fp) => {
         const person = persons.find(
           (p) => p.id === fp.personId || p.id === fp.person
@@ -102,6 +101,7 @@ export const useFamilyTreeStore = defineStore("familyTree", {
           return;
         }
         if (fp.role === "parent") {
+          // Initially, label as Father/Mother.
           const label = person.gender === "male" ? "Father" : "Mother";
           return {
             data: {
@@ -123,6 +123,7 @@ export const useFamilyTreeStore = defineStore("familyTree", {
       }).filter((e) => e !== undefined);
       logTransform("Built edges:", edges);
 
+      // Update each family object based on FamilyPerson records.
       amplifyData.FamilyPerson.forEach((fp) => {
         const person = persons.find(
           (p) => p.id === fp.personId || p.id === fp.person
@@ -147,7 +148,26 @@ export const useFamilyTreeStore = defineStore("familyTree", {
       });
       logTransform("Updated families:", families);
 
-      // Update store state.
+      // Post-process edges: if a family has no children, update parent's edge labels.
+      families.forEach((family) => {
+        if (family.sons.length === 0 && family.daughters.length === 0) {
+          // Find edges connecting parents to this family.
+          edges.forEach((edge) => {
+            if (edge.data.target === family.id) {
+              // Update based on parent's gender.
+              if (family.husbandId && edge.data.source === family.husbandId) {
+                edge.data.label = "Husband";
+              }
+              if (family.wifeId && edge.data.source === family.wifeId) {
+                edge.data.label = "Wife";
+              }
+            }
+          });
+        }
+      });
+      logTransform("Post-processed edges:", edges);
+
+      // Update the store state.
       this.persons = persons;
       this.families = families;
       this.nodes = [...personNodes, ...familyNodes];
