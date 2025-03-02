@@ -35,11 +35,38 @@ The Family Tree App lets you create, edit, import, and export family trees inter
 
 ### Prerequisites
 
-- [Node.js](https://nodejs.org/) (v14+ recommended)
-- npm (comes with Node.js)
+- [Node.js](https://nodejs.org/) (v22 required)
+- AWS Account with Amplify Access Roles
 
 ### Clone the Repository
 
 ```bash
 git clone https://github.com/yourusername/family-tree-app.git
 cd family-tree-app
+```
+
+### Setup Up Amplify Backend
+
+```bash
+npx amplify sandbox --profile awsprofile
+```
+
+### Install Dependencies
+
+```bash
+npm install
+```
+
+### Run the App
+
+```bash
+npm run dev
+```
+
+### Production Build
+
+```bash
+npm run build
+```
+
+Have fun and Enjoy building family trees ! 
