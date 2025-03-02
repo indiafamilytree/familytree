@@ -27,13 +27,15 @@
       <BaseButton @click="downloadTree" variant="inprogress">
         Download
       </BaseButton>
-      <BaseButton @click="saveTree" variant="primary"> Save </BaseButton>
+      <BaseButton @click="saveTree" variant="primary">
+        {{ saveButtonText }}
+      </BaseButton>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, watch, defineProps, defineEmits } from "vue";
+import { ref, computed, watch, defineProps, defineEmits } from "vue";
 import { useFamilyTreeStore } from "@/stores/family-tree-store/index";
 import PersonForm from "@/components/PersonForm.vue";
 import PersonNodeForm from "@/components/PersonNodeForm.vue";
@@ -46,10 +48,19 @@ const props = defineProps({
     default: null,
   },
 });
-const emit = defineEmits(["close"]);
+const emit = defineEmits(["close", "node-selected"]);
 const store = useFamilyTreeStore();
 const selectedPerson = ref(null);
 const selectedFamily = ref(null);
+
+// Reactive state for Save button: "idle", "saving", "saved"
+const saveStatus = ref("idle");
+
+const saveButtonText = computed(() => {
+  if (saveStatus.value === "saving") return "Saving…";
+  if (saveStatus.value === "saved") return "Saved";
+  return "Save";
+});
 
 function downloadTree() {
   const treeData = {
@@ -69,8 +80,18 @@ function downloadTree() {
   document.body.removeChild(link);
 }
 
-function saveTree() {
-  store.saveTreeToS3();
+async function saveTree() {
+  try {
+    saveStatus.value = "saving";
+    await store.saveTreeToS3();
+    saveStatus.value = "saved";
+    setTimeout(() => {
+      saveStatus.value = "idle";
+    }, 2000);
+  } catch (error) {
+    console.error("Error in saveTree:", error);
+    saveStatus.value = "idle";
+  }
 }
 
 watch(
@@ -95,9 +116,9 @@ watch(
 );
 
 function updatePerson(updatedPerson) {
-  const personIndex = store.persons.findIndex((p) => p.id === updatedPerson.id);
-  if (personIndex > -1) {
-    store.persons[personIndex] = updatedPerson;
+  const index = store.persons.findIndex((p) => p.id === updatedPerson.id);
+  if (index > -1) {
+    store.persons[index] = updatedPerson;
     const node = store.nodes.find((n) => n.data.id === updatedPerson.id);
     if (node) {
       node.data.label = updatedPerson.name;
@@ -106,8 +127,8 @@ function updatePerson(updatedPerson) {
 }
 
 function closePanel() {
-  // Optionally save on close as well.
-  store.saveTreeToS3();
+  // Optionally trigger save on close.
+  saveTree();
   selectedPerson.value = null;
   selectedFamily.value = null;
   emit("close");
@@ -122,16 +143,23 @@ function closePanel() {
   border-left: 1px solid #ccc;
   width: 350px;
 }
+
 .main-content {
   flex: 1;
   overflow-y: auto;
   padding: 1rem;
 }
+
 .footer-actions {
   display: flex;
   gap: 1rem;
   border-top: 1px solid #ccc;
   padding: 0.75rem 1rem;
   justify-content: flex-end;
+}
+
+/* Optional transition for button text changes */
+.footer-actions button {
+  transition: all 0.3s ease;
 }
 </style>
