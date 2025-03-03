@@ -1,4 +1,4 @@
-<!-- ./src/components/SidePanel.vue -->
+<!-- SidePanel.vue -->
 <template>
   <div class="side-panel">
     <div class="main-content">
@@ -22,10 +22,10 @@
         <h3 class="form-heading">Select a node</h3>
       </div>
     </div>
-    <!-- Footer actions -->
+    <!-- Footer actions with Export as SVG & Save -->
     <div class="footer-actions">
-      <BaseButton @click="downloadTree" variant="inprogress">
-        Download
+      <BaseButton @click="exportSVG" variant="inprogress">
+        Export as SVG
       </BaseButton>
       <BaseButton @click="saveTree" variant="primary">
         {{ saveButtonText }}
@@ -55,29 +55,15 @@ const selectedFamily = ref(null);
 
 // Reactive state for Save button: "idle", "saving", "saved"
 const saveStatus = ref("idle");
-
 const saveButtonText = computed(() => {
   if (saveStatus.value === "saving") return "Saving…";
   if (saveStatus.value === "saved") return "Saved";
   return "Save";
 });
 
-function downloadTree() {
-  const treeData = {
-    persons: store.persons,
-    families: store.families,
-    nodes: store.nodes,
-    edges: store.edges,
-    rootPerson: store.rootPerson,
-  };
-  const jsonStr = JSON.stringify(treeData, null, 2);
-  const dataUrl = "data:text/json;charset=utf-8," + encodeURIComponent(jsonStr);
-  const link = document.createElement("a");
-  link.setAttribute("href", dataUrl);
-  link.setAttribute("download", "family-tree.json");
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
+function exportSVG() {
+  // Dispatch a global event; FamilyChart should listen for this event and export SVG.
+  window.dispatchEvent(new CustomEvent("export-svg"));
 }
 
 async function saveTree() {

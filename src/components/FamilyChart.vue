@@ -1,4 +1,3 @@
-<!-- filepath: /Users/nkannaiyan/Code/ChatGPTApps/FamilyTree/family-tree-app/src/components/FamilyChart.vue -->
 <template>
   <div class="relative w-full h-screen">
     <!-- Cytoscape container -->
@@ -19,36 +18,37 @@
       </select>
     </div>
 
-    <!-- Export SVG button -->
-    <BaseButton
-      @click="exportAsSVG"
-      variant="primary"
-      class="absolute top-4 right-4"
-    >
-      Export as SVG
-    </BaseButton>
-
-    <!-- Stats Section -->
-    <div class="absolute top-16 right-4 bg-white p-2 border rounded shadow">
-      <div>Persons: {{ personCount }}</div>
-      <div>Families: {{ familyCount }}</div>
-      <div>Females: {{ femaleCount }}</div>
-      <div>Males: {{ maleCount }}</div>
+    <!-- Stats Section positioned at top right -->
+    <div class="stats-panel">
+      <div class="stat-item persons">
+        <span class="stat-label">Persons:</span>
+        <span class="stat-number">{{ personCount }}</span>
+      </div>
+      <div class="stat-item families">
+        <span class="stat-label">Families:</span>
+        <span class="stat-number">{{ familyCount }}</span>
+      </div>
+      <div class="stat-item females">
+        <span class="stat-label">Females:</span>
+        <span class="stat-number">{{ femaleCount }}</span>
+      </div>
+      <div class="stat-item males">
+        <span class="stat-label">Males:</span>
+        <span class="stat-number">{{ maleCount }}</span>
+      </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { onMounted, ref, watch, computed, defineEmits } from "vue";
+import { onMounted, onUnmounted, ref, watch, computed, defineEmits } from "vue";
 import cytoscape from "cytoscape";
 import dagre from "cytoscape-dagre";
 import klay from "cytoscape-klay";
 import coseBilkent from "cytoscape-cose-bilkent";
 import cytoscapeSVG from "cytoscape-svg";
 import { useFamilyTreeStore } from "@/stores/family-tree-store/index";
-import BaseButton from "@/components/BaseButton.vue";
 
-// Register Cytoscape extensions.
 cytoscape.use(dagre);
 cytoscape.use(klay);
 cytoscape.use(coseBilkent);
@@ -59,7 +59,7 @@ const familyTreeStore = useFamilyTreeStore();
 const cy = ref(null);
 const selectedLayout = ref("compound");
 
-// Compute statistics.
+// Computed statistics.
 const personCount = computed(() => familyTreeStore.persons.length);
 const familyCount = computed(() => familyTreeStore.families.length);
 const femaleCount = computed(
@@ -70,7 +70,6 @@ const maleCount = computed(
 );
 
 // --- Layout Configurations ---
-
 const compoundLayoutConfig = {
   global: {
     name: "dagre",
@@ -128,10 +127,10 @@ const klayLayoutConfig = {
   spacingFactor: 1,
   klay: {
     direction: "DOWN",
-    spacing: 50, // Increase for larger gaps between layers
-    edgeSpacingFactor: 2, // Increase edge-based spacing
-    inLayerSpacingFactor: 2, // Increase spacing among siblings
-    borderSpacing: 100, // Extra margin around layout
+    spacing: 50,
+    edgeSpacingFactor: 2,
+    inLayerSpacingFactor: 2,
+    borderSpacing: 100,
     thoroughness: 20,
   },
 };
@@ -150,7 +149,6 @@ const currentLayoutConfig = computed(() => {
 });
 
 // --- Color Bank for Edges ---
-// Removed near-white colors to keep colors visible.
 const colorBank = [
   "#e6194b",
   "#3cb44b",
@@ -165,7 +163,6 @@ const colorBank = [
   "#008080",
   "#e6beff",
   "#aa6e28",
-  // Removed near-white: "#fffac8",
   "#800000",
   "#aaffc3",
   "#808000",
@@ -272,15 +269,9 @@ const styleConfig = [
 
 // --- Chart Initialization & Event Handling ---
 function initializeChart() {
-  // Ensure a root person exists.
-  if (familyTreeStore.persons.length === 0) {
-    // familyTreeStore.initializeRootPerson({ name: "Marimuthu", gender: "male" });
-  }
-
   cy.value = cytoscape({
     container: document.getElementById("cy"),
     elements: [...familyTreeStore.nodes, ...familyTreeStore.edges],
-    // Use the selected layout configuration as defined.
     layout:
       selectedLayout.value === "compound"
         ? compoundLayoutConfig.global
@@ -292,7 +283,6 @@ function initializeChart() {
     userPanningEnabled: true,
   });
 
-  // Run the layout.
   if (selectedLayout.value === "compound") {
     cy.value.layout(compoundLayoutConfig.global).run();
     cy.value.nodes("[?parent]").layout(compoundLayoutConfig.compound).run();
@@ -300,32 +290,25 @@ function initializeChart() {
     cy.value.layout(currentLayoutConfig.value).run();
   }
 
-  // Once layout is ready, assign colors, center on root, and then fit the graph into the viewport.
   cy.value.ready(() => {
     assignEdgeColors();
     centerOnRoot();
-    // Optimize: Fit all elements into the container with 20px padding.
     cy.value.fit(cy.value.elements(), 20);
     console.log("Graph fitted to viewport.");
   });
 
-  // Node tap handler.
-  cy.value.on("tap", "node", (event) => {
+  cy.value.on("tap", (event) => {
     const node = event.target;
     const nodeData = node.data();
     console.log("Node tapped:", nodeData);
-    // If awaiting second person selection, dispatch that event.
     if (!nodeData.isFamily && window.awaitSecondPerson) {
       window.dispatchEvent(
         new CustomEvent("second-person-selected", { detail: nodeData })
       );
     } else {
-      // Otherwise, emit a "node-selected" event so the side panel opens the appropriate form.
       emit("node-selected", nodeData);
     }
   });
-
-  // Additional event handlers (e.g., right-click for editing) can be added here.
 }
 
 function centerOnRoot() {
@@ -344,12 +327,11 @@ watch(
     if (newRoot && cy.value) {
       setTimeout(() => {
         centerOnRoot();
-      }, 10); // adjust delay as needed
+      }, 10);
     }
   }
 );
 
-// Watch for changes in the store to update the chart.
 watch(
   () => [familyTreeStore.nodes, familyTreeStore.edges],
   (newValues) => {
@@ -372,6 +354,12 @@ watch(
 
 onMounted(() => {
   initializeChart();
+  // Listen for the global export-svg event dispatched from the SidePanel.
+  window.addEventListener("export-svg", exportAsSVG);
+});
+
+onUnmounted(() => {
+  window.removeEventListener("export-svg", exportAsSVG);
 });
 
 // Manual refresh layout.
@@ -415,7 +403,6 @@ function exportAsSVG() {
   height: 100%;
   background-color: #f9f9f9;
 }
-/* Layout selection dropdown styles */
 .layout-select {
   position: absolute;
   top: 10px;
@@ -434,14 +421,40 @@ function exportAsSVG() {
   padding: 4px;
   font-size: 0.9rem;
 }
-/* Manual refresh layout button styling */
-.layout-refresh-button {
+
+/* Stats panel now positioned at the top right */
+.stats-panel {
   position: absolute;
-  bottom: 20px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 10;
-  padding: 8px 12px;
-  font-size: 1rem;
+  top: 10px;
+  right: 10px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 0.9rem;
+}
+.stat-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-weight: 600;
+  color: #333;
+}
+.stat-item.persons {
+  background-color: #e0f7fa;
+}
+.stat-item.families {
+  background-color: #fce4ec;
+}
+.stat-item.females {
+  background-color: #f3e5f5;
+}
+.stat-item.males {
+  background-color: #e8f5e9;
+}
+.stat-number {
+  font-weight: 700;
+  color: #007bff;
 }
 </style>
