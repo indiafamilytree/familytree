@@ -1,9 +1,9 @@
-<!-- ./components/FamilyNodeForm.vue -->
+<!-- FamilyNodeForm.vue -->
 <template>
   <div class="form-container">
     <h3 class="form-title">Family Details</h3>
     <div v-if="familyData" class="form-body">
-      <!-- Husband -->
+      <!-- Parent Section -->
       <div class="form-group">
         <label class="form-label">Husband:</label>
         <div class="input-button-group">
@@ -17,13 +17,10 @@
             @click="saveHusband"
             variant="primary"
             class="save-button"
+            >✓</BaseButton
           >
-            ✓
-          </BaseButton>
         </div>
       </div>
-
-      <!-- Wife -->
       <div class="form-group">
         <label class="form-label">Wife:</label>
         <div class="input-button-group">
@@ -37,13 +34,12 @@
             @click="saveWife"
             variant="primary"
             class="save-button"
+            >✓</BaseButton
           >
-            ✓
-          </BaseButton>
         </div>
       </div>
 
-      <!-- Sons list -->
+      <!-- Children Section -->
       <div class="form-group">
         <label class="form-label">Sons:</label>
         <ul class="list">
@@ -56,20 +52,17 @@
             <span v-else class="list-text">{{ son.name }}</span>
             <div class="button-group" v-if="isEditing">
               <BaseButton
-                @click="saveSon(son)"
+                @click="saveChild(son)"
                 variant="primary"
                 class="save-button"
+                >✓</BaseButton
               >
-                ✓
-              </BaseButton>
-              <!-- Remove button now shows "X" -->
               <BaseButton
-                @click="removeSon(son.id)"
+                @click="removeChild(son.id, 'male')"
                 variant="danger"
                 class="remove-button"
+                >X</BaseButton
               >
-                X
-              </BaseButton>
             </div>
           </li>
         </ul>
@@ -80,18 +73,20 @@
             placeholder="New Son"
             class="form-input"
           />
-          <BaseButton @click="addNewSon" variant="primary" class="add-button">
+          <BaseButton
+            @click="addNewChild('male')"
+            variant="primary"
+            class="add-button"
+          >
             +
           </BaseButton>
         </div>
       </div>
-
-      <!-- Daughters list -->
       <div class="form-group">
         <label class="form-label">Daughters:</label>
         <ul class="list">
           <li
-            v-for="(daughter, i) in localDaughters"
+            v-for="daughter in localDaughters"
             :key="daughter.id"
             class="list-item"
           >
@@ -103,19 +98,17 @@
             <span v-else class="list-text">{{ daughter.name }}</span>
             <div class="button-group" v-if="isEditing">
               <BaseButton
-                @click="saveDaughter(daughter)"
+                @click="saveChild(daughter)"
                 variant="primary"
                 class="save-button"
+                >✓</BaseButton
               >
-                ✓
-              </BaseButton>
               <BaseButton
-                @click="removeDaughter(daughter.id)"
+                @click="removeChild(daughter.id, 'female')"
                 variant="danger"
                 class="remove-button"
+                >X</BaseButton
               >
-                X
-              </BaseButton>
             </div>
           </li>
         </ul>
@@ -127,7 +120,7 @@
             class="form-input"
           />
           <BaseButton
-            @click="addNewDaughter"
+            @click="addNewChild('female')"
             variant="primary"
             class="add-button"
           >
@@ -143,25 +136,22 @@
           @click="isEditing = true"
           variant="secondary"
           class="edit-button"
+          >Edit</BaseButton
         >
-          Edit
-        </BaseButton>
         <BaseButton
           v-if="isEditing"
           @click="saveChanges"
           variant="primary"
           class="save-button"
+          >Save</BaseButton
         >
-          Save
-        </BaseButton>
         <BaseButton
           v-if="isEditing"
           @click="cancelEdit"
           variant="danger"
           class="cancel-button"
+          >Cancel</BaseButton
         >
-          Cancel
-        </BaseButton>
       </div>
     </div>
     <div v-else>
@@ -185,11 +175,12 @@ const store = useFamilyTreeStore();
 const isEditing = ref(false);
 const localHusbandName = ref("");
 const localWifeName = ref("");
-const localSons = ref([]);
-const localDaughters = ref([]);
+const localSons = ref([]); // Array of male children objects
+const localDaughters = ref([]); // Array of female children objects
 const tempSonName = ref("");
 const tempDaughterName = ref("");
 
+// When familyData changes, load the family details.
 watch(
   () => props.familyData,
   (val) => {
@@ -203,70 +194,69 @@ watch(
 function loadFamily(familyId) {
   const fam = store.families.find((f) => f.id === familyId);
   if (!fam) return;
-  console.log(fam);
-  // Load husband and wife names using their IDs
-  localHusbandName.value = fam.husbandId
-    ? store.persons.find((p) => p.id === fam.husbandId)?.name || ""
-    : "";
-  localWifeName.value = fam.wifeId
-    ? store.persons.find((p) => p.id === fam.wifeId)?.name || ""
-    : "";
 
-  // For children, look up each ID in the sons/daughters arrays.
-  localSons.value = fam.sons
-    .map((id) => store.persons.find((p) => p.id === id))
+  // Use the new model's members array.
+  // Extract parents (relationship === "parent") and children (relationship === "child")
+  const parentMembers = fam.members.filter((m) => m.relationship === "parent");
+  const childMembers = fam.members.filter((m) => m.relationship === "child");
+
+  // Lookup the parent persons.
+  const parents = parentMembers
+    .map((m) => store.persons.find((p) => p.id === m.personId))
     .filter(Boolean);
-  localDaughters.value = fam.daughters
-    .map((id) => store.persons.find((p) => p.id === id))
+  localHusbandName.value = parents.find((p) => p.gender === "male")?.name || "";
+  localWifeName.value = parents.find((p) => p.gender === "female")?.name || "";
+
+  // Lookup the child persons.
+  const children = childMembers
+    .map((m) => store.persons.find((p) => p.id === m.personId))
     .filter(Boolean);
+  localSons.value = children.filter((p) => p.gender === "male");
+  localDaughters.value = children.filter((p) => p.gender === "female");
 }
 
-function addNewSon() {
-  if (tempSonName.value) {
-    const newSon = {
-      id: `temp-son-${localSons.value.length + 1}`,
+function addNewChild(gender) {
+  // Add a new temporary child object to local list.
+  if (gender === "male" && tempSonName.value) {
+    const tempChild = {
+      id: `temp-${Date.now()}`,
       name: tempSonName.value,
-      gender: "male",
+      gender,
     };
-    localSons.value.push(newSon);
+    localSons.value.push(tempChild);
     tempSonName.value = "";
-  }
-}
-
-function addNewDaughter() {
-  if (tempDaughterName.value) {
-    const newDaughter = {
-      id: `temp-daughter-${localDaughters.value.length + 1}`,
+  } else if (gender === "female" && tempDaughterName.value) {
+    const tempChild = {
+      id: `temp-${Date.now()}`,
       name: tempDaughterName.value,
-      gender: "female",
+      gender,
     };
-    localDaughters.value.push(newDaughter);
+    localDaughters.value.push(tempChild);
     tempDaughterName.value = "";
   }
 }
 
-function removeSon(sonId) {
-  // Remove from the local list
-  localSons.value = localSons.value.filter((son) => son.id !== sonId);
-  // Remove the person from the store
-  store.persons = store.persons.filter((p) => p.id !== sonId);
-  // Remove the corresponding node
-  store.nodes = store.nodes.filter((n) => n.data.id !== sonId);
-  // Remove any edges that reference this person
-  store.edges = store.edges.filter(
-    (e) => e.data.source !== sonId && e.data.target !== sonId
-  );
+function removeChild(childId, gender) {
+  if (gender === "male") {
+    localSons.value = localSons.value.filter((child) => child.id !== childId);
+  } else {
+    localDaughters.value = localDaughters.value.filter(
+      (child) => child.id !== childId
+    );
+  }
+  // Optionally, you might also remove the person from the store.
+  // For simplicity, we assume removal only from the local edit.
 }
 
-function removeDaughter(daughterId) {
-  localDaughters.value = localDaughters.value.filter(
-    (daughter) => daughter.id !== daughterId
-  );
-  store.persons = store.persons.filter((p) => p.id !== daughterId);
-  store.nodes = store.nodes.filter((n) => n.data.id !== daughterId);
-  store.edges = store.edges.filter(
-    (e) => e.data.source !== daughterId && e.data.target !== daughterId
-  );
+function saveChild(child) {
+  // For an individual child edit, update the corresponding store person.
+  const person = store.persons.find((p) => p.id === child.id);
+  if (person) {
+    person.name = child.name;
+    // Also update the node label.
+    const node = store.nodes.find((n) => n.data.id === person.id);
+    if (node) node.data.label = child.name;
+  }
 }
 
 function saveChanges() {
@@ -274,229 +264,92 @@ function saveChanges() {
   const fam = store.families.find((f) => f.id === props.familyData.id);
   if (!fam) return;
 
-  // Update spouse information.
-  updateHusband(fam);
-  updateWife(fam);
+  // Update parents.
+  // For Husband: if localHusbandName is provided, check if a parent exists.
+  let husband = store.persons.find(
+    (p) => p.gender === "male" && p.name === localHusbandName.value
+  );
+  if (!husband && localHusbandName.value) {
+    const newId = `person-${store.persons.length + 1}`;
+    husband = { id: newId, name: localHusbandName.value, gender: "male" };
+    store.persons.push(husband);
+    store.nodes.push({
+      data: { id: newId, label: husband.name, gender: husband.gender },
+    });
+    fam.members.push({ personId: newId, relationship: "parent" });
+    store.edges.push({
+      data: { source: newId, target: fam.id, label: "Father" },
+    });
+  } else if (husband) {
+    husband.name = localHusbandName.value;
+  }
 
-  // Process new sons: for any son with a temporary ID, create a permanent person.
-  const permanentSons = localSons.value.map((son) => {
-    if (son.id.startsWith("temp-")) {
-      // Create a permanent person for the new son.
-      addNewPersonToFamily(fam, son.name, "Son", "male");
-      // Return the newly created person (assumed to be the last person added)
-      return store.persons[store.persons.length - 1];
+  let wife = store.persons.find(
+    (p) => p.gender === "female" && p.name === localWifeName.value
+  );
+  if (!wife && localWifeName.value) {
+    const newId = `person-${store.persons.length + 1}`;
+    wife = { id: newId, name: localWifeName.value, gender: "female" };
+    store.persons.push(wife);
+    store.nodes.push({
+      data: { id: newId, label: wife.name, gender: wife.gender },
+    });
+    fam.members.push({ personId: newId, relationship: "parent" });
+    store.edges.push({
+      data: { source: newId, target: fam.id, label: "Mother" },
+    });
+  } else if (wife) {
+    wife.name = localWifeName.value;
+  }
+
+  // Process new children from localSons and localDaughters.
+  localSons.value.forEach((child) => {
+    if (child.id.startsWith("temp-")) {
+      const newId = `person-${store.persons.length + 1}`;
+      const newChild = { id: newId, name: child.name, gender: child.gender };
+      store.persons.push(newChild);
+      store.nodes.push({
+        data: { id: newId, label: newChild.name, gender: newChild.gender },
+      });
+      fam.members.push({ personId: newId, relationship: "child" });
+      store.edges.push({
+        data: { source: fam.id, target: newId, label: "Son" },
+      });
+      child.id = newId; // update temporary id
     }
-    return son;
   });
-  // Update localSons with permanent entries.
-  localSons.value = permanentSons;
-  // Update the family's sons array with the permanent IDs.
-  fam.sons = localSons.value.map((son) => son.id);
-
-  // Process new daughters similarly.
-  const permanentDaughters = localDaughters.value.map((daughter) => {
-    if (daughter.id.startsWith("temp-")) {
-      addNewPersonToFamily(fam, daughter.name, "Daughter", "female");
-      return store.persons[store.persons.length - 1];
+  localDaughters.value.forEach((child) => {
+    if (child.id.startsWith("temp-")) {
+      const newId = `person-${store.persons.length + 1}`;
+      const newChild = { id: newId, name: child.name, gender: child.gender };
+      store.persons.push(newChild);
+      store.nodes.push({
+        data: { id: newId, label: newChild.name, gender: newChild.gender },
+      });
+      fam.members.push({ personId: newId, relationship: "child" });
+      store.edges.push({
+        data: { source: fam.id, target: newId, label: "Daughter" },
+      });
+      child.id = newId;
     }
-    return daughter;
   });
-  localDaughters.value = permanentDaughters;
-  fam.daughters = localDaughters.value.map((daughter) => daughter.id);
-
-  // Remove extraneous child edges (if any) that no longer match the updated arrays.
-  store.edges = store.edges.filter((edge) => {
-    if (edge.data.source === fam.id && edge.data.label === "Son") {
-      return fam.sons.includes(edge.data.target);
-    }
-    if (edge.data.source === fam.id && edge.data.label === "Daughter") {
-      return fam.daughters.includes(edge.data.target);
-    }
-    return true;
-  });
-
-  updateEdgeLabels(fam);
 
   isEditing.value = false;
-  loadFamily(props.familyData.id); // Reload the updated family details for the form.
-}
-
-function updateEdgeLabels(fam) {
-  // Update husband edge
-  if (fam.husbandId) {
-    const husbandEdge = store.edges.find(
-      (e) => e.data.source === fam.husbandId && e.data.target === fam.id
-    );
-    if (husbandEdge) {
-      husbandEdge.data.label =
-        fam.sons.length > 0 || fam.daughters.length > 0 ? "Father" : "Husband";
-    }
-  }
-  // Update wife edge
-  if (fam.wifeId) {
-    const wifeEdge = store.edges.find(
-      (e) => e.data.source === fam.wifeId && e.data.target === fam.id
-    );
-    if (wifeEdge) {
-      wifeEdge.data.label =
-        fam.sons.length > 0 || fam.daughters.length > 0 ? "Mother" : "Wife";
-    }
-  }
-  // Update child edges for sons
-  if (Array.isArray(fam.sons)) {
-    fam.sons.forEach((childId) => {
-      const sonEdge = store.edges.find(
-        (e) => e.data.source === fam.id && e.data.target === childId
-      );
-      if (sonEdge) {
-        sonEdge.data.label = "Son";
-      }
-    });
-  }
-  // Update child edges for daughters
-  if (Array.isArray(fam.daughters)) {
-    fam.daughters.forEach((childId) => {
-      const daughterEdge = store.edges.find(
-        (e) => e.data.source === fam.id && e.data.target === childId
-      );
-      if (daughterEdge) {
-        daughterEdge.data.label = "Daughter";
-      }
-    });
-  }
-}
-
-function updateHusband(fam) {
-  if (localHusbandName.value) {
-    if (fam.husbandId) {
-      const h = store.persons.find((p) => p.id === fam.husbandId);
-      if (h) {
-        h.name = localHusbandName.value;
-        updateNodeLabel(h.id, h.name);
-      }
-    } else {
-      addNewPersonToFamily(fam, localHusbandName.value, "Husband", "male");
-    }
-  } else if (fam.husbandId) {
-    fam.husbandId = null;
-  }
-}
-
-function updateWife(fam) {
-  if (localWifeName.value) {
-    if (fam.wifeId) {
-      const w = store.persons.find((p) => p.id === fam.wifeId);
-      if (w) {
-        w.name = localWifeName.value;
-        updateNodeLabel(w.id, w.name);
-      }
-    } else {
-      addNewPersonToFamily(fam, localWifeName.value, "Wife", "female");
-    }
-  } else if (fam.wifeId) {
-    fam.wifeId = null;
-  }
-}
-
-function saveHusband() {
-  if (props.familyData && props.familyData.husbandId) {
-    const husband = store.persons.find(
-      (p) => p.id === props.familyData.husbandId
-    );
-    if (husband) {
-      husband.name = localHusbandName.value;
-      console.log("Husband updated:", husband);
-    }
-    isEditing.value = false;
-  }
-}
-
-function saveWife() {
-  if (props.familyData && props.familyData.wifeId) {
-    const wife = store.persons.find((p) => p.id === props.familyData.wifeId);
-    if (wife) {
-      wife.name = localWifeName.value;
-      console.log("Wife updated:", wife);
-    }
-    isEditing.value = false;
-  }
-}
-
-// Save functions for Son and Daughter.
-function saveSon(son) {
-  const s = store.persons.find((p) => p.id === son.id);
-  if (s) {
-    s.name = son.name;
-    updateNodeLabel(s.id, s.name);
-    console.log("Son updated:", s);
-  }
-}
-
-function saveDaughter(daughter) {
-  const d = store.persons.find((p) => p.id === daughter.id);
-  if (d) {
-    d.name = daughter.name;
-    updateNodeLabel(d.id, d.name);
-    console.log("Daughter updated:", d);
-  }
-}
-
-function updateNodeLabel(personId, newName) {
-  const nodeRef = store.nodes.find((n) => n.data.id === personId);
-  if (nodeRef) nodeRef.data.label = newName;
-}
-
-function updateFamilyNodeLabel(fam) {
-  const familyNode = store.nodes.find((n) => n.data.id === fam.id);
-  if (familyNode) {
-    const husbandLabel = localHusbandName.value
-      ? `${localHusbandName.value}\n`
-      : "";
-    const wifeLabel = localWifeName.value;
-    familyNode.data.label = husbandLabel + wifeLabel;
-  }
-}
-
-function addNewPersonToFamily(fam, name, relation, gender) {
-  const newPersonId = `person-${store.persons.length + 1}`;
-  const newPerson = {
-    id: newPersonId,
-    name,
-    gender,
-  };
-  store.persons.push(newPerson);
-  store.nodes.push({
-    data: { id: newPersonId, label: newPerson.name, gender },
-  });
-
-  if (relation === "Husband") {
-    fam.husbandId = newPersonId;
-  } else if (relation === "Wife") {
-    fam.wifeId = newPersonId;
-  } else if (relation === "Son") {
-    if (!fam.sons) {
-      fam.sons = [];
-    }
-    fam.sons.push(newPersonId);
-  } else if (relation === "Daughter") {
-    if (!fam.daughters) {
-      fam.daughters = [];
-    }
-    fam.daughters.push(newPersonId);
-  }
-
-  const isChild = relation === "Son" || relation === "Daughter";
-  const edgeData = isChild
-    ? { source: fam.id, target: newPersonId, label: relation }
-    : { source: newPersonId, target: fam.id, label: relation };
-
-  store.edges.push({ data: edgeData });
-  updateFamilyNodeLabel(fam);
+  loadFamily(props.familyData.id);
 }
 
 function cancelEdit() {
   isEditing.value = false;
   if (props.familyData) loadFamily(props.familyData.id);
+  emit("close");
+}
+
+// For now, saveHusband and saveWife are placeholders since saving occurs in saveChanges.
+function saveHusband() {
+  isEditing.value = false;
+}
+function saveWife() {
+  isEditing.value = false;
 }
 </script>
 
@@ -566,13 +419,25 @@ function cancelEdit() {
   gap: 5px;
   align-items: center;
 }
-.form-button {
-  padding: 5px 10px;
-  border: none;
-  border-radius: 4px;
-  font-size: 0.9rem;
-  cursor: pointer;
-  white-space: nowrap;
+.form-actions {
+  display: flex;
+  margin-top: 10px;
+  gap: 10px;
+  justify-content: flex-end;
+}
+.input-button-group {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  width: 100%;
+}
+.input-button-group .form-input {
+  flex-grow: 1;
+}
+.add-input-group {
+  display: flex;
+  gap: 5px;
+  align-items: center;
 }
 .save-button {
   background-color: #28a745;
@@ -601,29 +466,5 @@ function cancelEdit() {
   background-color: #6c757d;
   color: white;
   padding: 6px 8px;
-}
-.add-input-group {
-  display: flex;
-  gap: 5px;
-  align-items: center;
-}
-.input-button-group {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  width: 100%;
-}
-.input-button-group .form-input {
-  flex-grow: 1;
-}
-.form-actions {
-  display: flex;
-  margin-top: 10px;
-  gap: 10px;
-  justify-content: flex-end;
-}
-.form-actions button {
-  width: auto;
-  flex: none;
 }
 </style>

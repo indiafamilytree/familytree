@@ -27,6 +27,14 @@
     >
       Export as SVG
     </BaseButton>
+
+    <!-- Stats Section -->
+    <div class="absolute top-16 right-4 bg-white p-2 border rounded shadow">
+      <div>Persons: {{ personCount }}</div>
+      <div>Families: {{ familyCount }}</div>
+      <div>Females: {{ femaleCount }}</div>
+      <div>Males: {{ maleCount }}</div>
+    </div>
   </div>
 </template>
 
@@ -50,6 +58,16 @@ const emit = defineEmits(["node-selected"]);
 const familyTreeStore = useFamilyTreeStore();
 const cy = ref(null);
 const selectedLayout = ref("compound");
+
+// Compute statistics.
+const personCount = computed(() => familyTreeStore.persons.length);
+const familyCount = computed(() => familyTreeStore.families.length);
+const femaleCount = computed(
+  () => familyTreeStore.persons.filter((p) => p.gender === "female").length
+);
+const maleCount = computed(
+  () => familyTreeStore.persons.filter((p) => p.gender === "male").length
+);
 
 // --- Layout Configurations ---
 

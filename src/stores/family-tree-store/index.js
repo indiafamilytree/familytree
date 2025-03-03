@@ -157,47 +157,55 @@ export const useFamilyTreeStore = defineStore("familyTree", {
         const path = `entity-files/${userId}/amplify-tree.json`;
         logSave("S3 path:", path);
 
-        // Transform Persons: Map store persons to the new format.
+        // Transform Persons: Map store persons to new format.
         const persons = this.persons.map((person) => ({
-          personId: person.id, // old "id" becomes personId
-          firstName: person.name, // old "name" becomes firstName
+          personId: person.id,
+          firstName: person.name,
           gender: person.gender,
         }));
 
-        // Transform Families: Convert the explicit fields into a "members" array.
+        // Transform Families:
+        // For each family, if its members array is empty, we rebuild it from the edges.
         const families = this.families.map((family) => {
-          const members = [];
-
-          // For each parent role, push a member with role "parent".
-          if (family.husbandId) {
-            members.push({
-              personId: family.husbandId,
-              relationship: "parent",
+          let members = [];
+          if (family.members && family.members.length > 0) {
+            members = family.members;
+          } else {
+            // Rebuild members from store edges.
+            this.edges.forEach((edge) => {
+              // If edge goes from a person node to the family node, treat it as a "parent" link.
+              if (
+                edge.data.target === family.id &&
+                edge.data.source.startsWith("person")
+              ) {
+                members.push({
+                  personId: edge.data.source,
+                  relationship: "parent",
+                });
+              }
+              // If edge goes from the family node to a person node, treat it as a "child" link.
+              if (
+                edge.data.source === family.id &&
+                edge.data.target.startsWith("person")
+              ) {
+                members.push({
+                  personId: edge.data.target,
+                  relationship: "child",
+                });
+              }
             });
+            // Remove duplicates (if any) by personId.
+            members = Array.from(
+              new Map(members.map((m) => [m.personId, m])).values()
+            );
           }
-          if (family.wifeId) {
-            members.push({ personId: family.wifeId, relationship: "parent" });
-          }
-          // For each child, push a member with role "child".
-          if (family.sons && Array.isArray(family.sons)) {
-            family.sons.forEach((sonId) => {
-              members.push({ personId: sonId, relationship: "child" });
-            });
-          }
-          if (family.daughters && Array.isArray(family.daughters)) {
-            family.daughters.forEach((daughterId) => {
-              members.push({ personId: daughterId, relationship: "child" });
-            });
-          }
-
           return {
-            familyId: family.id, // use the existing family id
+            familyId: family.id,
             familySignature: family.familySignature || "",
             members,
           };
         });
 
-        // Build the final data object in the new format.
         const amplifyData = {
           Persons: persons,
           Families: families,
