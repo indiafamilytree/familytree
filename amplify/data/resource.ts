@@ -16,28 +16,17 @@ const schema = a.schema({
       personId: a.string(),
       firstName: a.string(),
       gender: a.string(),
-      // Reference the join model via personId
-      families: a.hasMany("FamilyPerson", "personId"),
     })
     .authorization((allow) => [allow.guest()]),
 
   Families: a
     .model({
       familyId: a.string(),
-      // Reference the join model via familyId
-      members: a.hasMany("FamilyPerson", "familyId"),
-    })
-    .authorization((allow) => [allow.guest()]),
-
-  FamilyPerson: a
-    .model({
-      familyId: a.string(),
-      personId: a.string(),
-      // role can be "parent" or "child"
-      role: a.string(),
-      // Define the relationships that correspond to the foreign keys
-      person: a.belongsTo("Persons", "personId"),
-      family: a.belongsTo("Families", "familyId"),
+      familySignature: a.string(),
+      members: a.customType({
+        personId: a.string().required(),
+        relationship: a.string().required(),
+      }),
     })
     .authorization((allow) => [allow.guest()]),
 });

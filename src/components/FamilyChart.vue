@@ -58,7 +58,7 @@ const compoundLayoutConfig = {
     name: "dagre",
     rankDir: "TB",
     fit: false,
-    spacingFactor: 1.5,
+    spacingFactor: 1,
     nodeSep: 100,
     edgeSep: 50,
     rankSep: 150,
@@ -97,7 +97,7 @@ const dagreLayoutConfig = {
       ? 0.5
       : 1;
   },
-  spacingFactor: 1.5,
+  spacingFactor: 1,
   nodeSep: 100,
   edgeSep: 50,
   rankSep: 150,
@@ -110,7 +110,7 @@ const klayLayoutConfig = {
   spacingFactor: 1,
   klay: {
     direction: "DOWN",
-    spacing: 100, // Increase for larger gaps between layers
+    spacing: 50, // Increase for larger gaps between layers
     edgeSpacingFactor: 2, // Increase edge-based spacing
     inLayerSpacingFactor: 2, // Increase spacing among siblings
     borderSpacing: 100, // Extra margin around layout

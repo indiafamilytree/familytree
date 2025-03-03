@@ -65,107 +65,77 @@ export const useFamilyTreeStore = defineStore("familyTree", {
         logLoad("Error loading Amplify data from S3:", error);
       }
     },
+
     transformAmplifyDataToStore(amplifyData) {
-      logTransform("Starting transformation.");
-      // Map Persons using the actual keys.
+      logTransform("Starting transformation of new model format.");
+
+      // Map Persons: use "personId" as id and "firstName" as name.
       const persons = amplifyData.Persons.map((p) => ({
-        id: p.id, // expecting "id"
-        name: p.name, // expecting "name"
+        id: p.personId,
+        name: p.firstName,
         gender: p.gender,
       }));
       logTransform("Mapped persons:", persons);
+
       const personNodes = persons.map((p) => ({
         data: { id: p.id, label: p.name, gender: p.gender },
       }));
 
-      // Map Families using either "id" or "familyId".
+      // Map Families: each family now has a "familyId", "familySignature", and "members" array.
       const families = amplifyData.Families.map((f) => ({
-        id: f.id || f.familyId,
-        husbandId: null,
-        wifeId: null,
-        sons: [],
-        daughters: [],
+        id: f.familyId,
+        familySignature: f.familySignature || "",
+        members: f.members || [], // Each member is { personId, relationship }
       }));
       logTransform("Mapped families:", families);
+
       const familyNodes = families.map((f) => ({
         data: { id: f.id, label: "Family", isFamily: true },
       }));
 
-      // Build edges from the FamilyPerson join table.
-      const edges = amplifyData.FamilyPerson.map((fp) => {
-        const person = persons.find(
-          (p) => p.id === fp.personId || p.id === fp.person
-        );
-        if (!person) {
-          logTransform("No person found for record:", fp);
-          return;
-        }
-        if (fp.role === "parent") {
-          // Initially, label as Father/Mother.
-          const label = person.gender === "male" ? "Father" : "Mother";
-          return {
-            data: {
-              source: fp.personId || fp.person,
-              target: fp.familyId || fp.family,
-              label,
-            },
-          };
-        } else if (fp.role === "child") {
-          const label = person.gender === "male" ? "Son" : "Daughter";
-          return {
-            data: {
-              source: fp.familyId || fp.family,
-              target: fp.personId || fp.person,
-              label,
-            },
-          };
-        }
-      }).filter((e) => e !== undefined);
+      // Build edges based on family members.
+      // For each family, for each member, create an edge:
+      // - If the member's relationship is "parent": edge from Person -> Family (with label based on gender)
+      // - If "child": edge from Family -> Person (with label based on gender)
+      const edges = [];
+      families.forEach((f) => {
+        f.members.forEach((member) => {
+          const person = persons.find((p) => p.id === member.personId);
+          if (!person) {
+            logTransform("No person found for member:", member);
+            return;
+          }
+          if (member.relationship === "parent") {
+            const label = person.gender === "male" ? "Father" : "Mother";
+            edges.push({
+              data: {
+                source: person.id,
+                target: f.id,
+                label,
+              },
+            });
+          } else if (member.relationship === "child") {
+            const label = person.gender === "male" ? "Son" : "Daughter";
+            edges.push({
+              data: {
+                source: f.id,
+                target: person.id,
+                label,
+              },
+            });
+          } else {
+            // Fallback: simply use the stored relationship.
+            edges.push({
+              data: {
+                source: person.id,
+                target: f.id,
+                label: member.relationship,
+              },
+            });
+          }
+        });
+      });
       logTransform("Built edges:", edges);
-
-      // Update each family object based on FamilyPerson records.
-      amplifyData.FamilyPerson.forEach((fp) => {
-        const person = persons.find(
-          (p) => p.id === fp.personId || p.id === fp.person
-        );
-        const family = families.find(
-          (f) => f.id === fp.familyId || f.id === fp.family
-        );
-        if (!person || !family) return;
-        if (fp.role === "parent") {
-          if (person.gender === "male") {
-            family.husbandId = person.id;
-          } else {
-            family.wifeId = person.id;
-          }
-        } else if (fp.role === "child") {
-          if (person.gender === "male") {
-            family.sons.push(person.id);
-          } else {
-            family.daughters.push(person.id);
-          }
-        }
-      });
-      logTransform("Updated families:", families);
-
-      // Post-process edges: if a family has no children, update parent's edge labels.
-      families.forEach((family) => {
-        if (family.sons.length === 0 && family.daughters.length === 0) {
-          // Find edges connecting parents to this family.
-          edges.forEach((edge) => {
-            if (edge.data.target === family.id) {
-              // Update based on parent's gender.
-              if (family.husbandId && edge.data.source === family.husbandId) {
-                edge.data.label = "Husband";
-              }
-              if (family.wifeId && edge.data.source === family.wifeId) {
-                edge.data.label = "Wife";
-              }
-            }
-          });
-        }
-      });
-      logTransform("Post-processed edges:", edges);
 
       // Update the store state.
       this.persons = persons;
@@ -187,28 +157,54 @@ export const useFamilyTreeStore = defineStore("familyTree", {
         const path = `entity-files/${userId}/amplify-tree.json`;
         logSave("S3 path:", path);
 
-        const familyPersons = this.edges.map((edge) => {
-          if (edge.data.source.startsWith("person")) {
-            return {
-              familyId: edge.data.target,
-              personId: edge.data.source,
-              role: "parent",
-            };
-          } else {
-            return {
-              familyId: edge.data.source,
-              personId: edge.data.target,
-              role: "child",
-            };
+        // Transform Persons: Map store persons to the new format.
+        const persons = this.persons.map((person) => ({
+          personId: person.id, // old "id" becomes personId
+          firstName: person.name, // old "name" becomes firstName
+          gender: person.gender,
+        }));
+
+        // Transform Families: Convert the explicit fields into a "members" array.
+        const families = this.families.map((family) => {
+          const members = [];
+
+          // For each parent role, push a member with role "parent".
+          if (family.husbandId) {
+            members.push({
+              personId: family.husbandId,
+              relationship: "parent",
+            });
           }
+          if (family.wifeId) {
+            members.push({ personId: family.wifeId, relationship: "parent" });
+          }
+          // For each child, push a member with role "child".
+          if (family.sons && Array.isArray(family.sons)) {
+            family.sons.forEach((sonId) => {
+              members.push({ personId: sonId, relationship: "child" });
+            });
+          }
+          if (family.daughters && Array.isArray(family.daughters)) {
+            family.daughters.forEach((daughterId) => {
+              members.push({ personId: daughterId, relationship: "child" });
+            });
+          }
+
+          return {
+            familyId: family.id, // use the existing family id
+            familySignature: family.familySignature || "",
+            members,
+          };
         });
+
+        // Build the final data object in the new format.
         const amplifyData = {
-          Persons: this.persons,
-          Families: this.families,
-          FamilyPerson: familyPersons,
+          Persons: persons,
+          Families: families,
         };
+
         logSave("Amplify data to save:", amplifyData);
-        const file = new Blob([JSON.stringify(amplifyData)], {
+        const file = new Blob([JSON.stringify(amplifyData, null, 2)], {
           type: "application/json",
         });
         const result = await uploadData({
