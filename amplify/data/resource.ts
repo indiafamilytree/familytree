@@ -17,7 +17,7 @@ const schema = a.schema({
       firstName: a.string(),
       gender: a.string(),
     })
-    .authorization((allow) => [allow.guest()]),
+    .authorization((allow) => [allow.owner()]),
 
   Families: a
     .model({
@@ -28,7 +28,7 @@ const schema = a.schema({
         relationship: a.string().required(),
       }),
     })
-    .authorization((allow) => [allow.guest()]),
+    .authorization((allow) => [allow.owner()]),
 });
 
 export type Schema = ClientSchema<typeof schema>;

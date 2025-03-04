@@ -217,6 +217,7 @@ function loadFamily(familyId) {
 
 function addNewChild(gender) {
   // Add a new temporary child object to local list.
+  // We can keep temporary IDs as they are.
   if (gender === "male" && tempSonName.value) {
     const tempChild = {
       id: `temp-${Date.now()}`,
@@ -244,8 +245,7 @@ function removeChild(childId, gender) {
       (child) => child.id !== childId
     );
   }
-  // Optionally, you might also remove the person from the store.
-  // For simplicity, we assume removal only from the local edit.
+  // Optionally, remove the person from the store if needed.
 }
 
 function saveChild(child) {
@@ -265,12 +265,12 @@ function saveChanges() {
   if (!fam) return;
 
   // Update parents.
-  // For Husband: if localHusbandName is provided, check if a parent exists.
+  // For Husband:
   let husband = store.persons.find(
     (p) => p.gender === "male" && p.name === localHusbandName.value
   );
   if (!husband && localHusbandName.value) {
-    const newId = `person-${store.persons.length + 1}`;
+    const newId = store.getNewPersonId();
     husband = { id: newId, name: localHusbandName.value, gender: "male" };
     store.persons.push(husband);
     store.nodes.push({
@@ -284,11 +284,12 @@ function saveChanges() {
     husband.name = localHusbandName.value;
   }
 
+  // For Wife:
   let wife = store.persons.find(
     (p) => p.gender === "female" && p.name === localWifeName.value
   );
   if (!wife && localWifeName.value) {
-    const newId = `person-${store.persons.length + 1}`;
+    const newId = store.getNewPersonId();
     wife = { id: newId, name: localWifeName.value, gender: "female" };
     store.persons.push(wife);
     store.nodes.push({
@@ -302,10 +303,10 @@ function saveChanges() {
     wife.name = localWifeName.value;
   }
 
-  // Process new children from localSons and localDaughters.
+  // Process new children from localSons.
   localSons.value.forEach((child) => {
     if (child.id.startsWith("temp-")) {
-      const newId = `person-${store.persons.length + 1}`;
+      const newId = store.getNewPersonId();
       const newChild = { id: newId, name: child.name, gender: child.gender };
       store.persons.push(newChild);
       store.nodes.push({
@@ -313,14 +314,20 @@ function saveChanges() {
       });
       fam.members.push({ personId: newId, relationship: "child" });
       store.edges.push({
-        data: { source: fam.id, target: newId, label: "Son" },
+        data: {
+          source: fam.id,
+          target: newId,
+          label: child.gender === "male" ? "Son" : "Daughter",
+        },
       });
       child.id = newId; // update temporary id
     }
   });
+
+  // Process new children from localDaughters.
   localDaughters.value.forEach((child) => {
     if (child.id.startsWith("temp-")) {
-      const newId = `person-${store.persons.length + 1}`;
+      const newId = store.getNewPersonId();
       const newChild = { id: newId, name: child.name, gender: child.gender };
       store.persons.push(newChild);
       store.nodes.push({
@@ -328,7 +335,11 @@ function saveChanges() {
       });
       fam.members.push({ personId: newId, relationship: "child" });
       store.edges.push({
-        data: { source: fam.id, target: newId, label: "Daughter" },
+        data: {
+          source: fam.id,
+          target: newId,
+          label: child.gender === "male" ? "Son" : "Daughter",
+        },
       });
       child.id = newId;
     }

@@ -1,4 +1,4 @@
-<!-- ./components/PersonNodeForm.vue -->
+<!-- PersonNodeForm.vue -->
 <template>
   <div class="person-node-form">
     <!-- Family Option at the Top -->
@@ -54,8 +54,9 @@
             @click="addSonLocally"
             variant="primary"
             class="add-button"
-            >+</BaseButton
           >
+            +
+          </BaseButton>
         </div>
         <ul>
           <li v-for="(son, i) in newSons" :key="i" class="list-item">
@@ -64,8 +65,9 @@
               @click="removeSonLocally(i)"
               variant="danger"
               class="remove-button"
-              >X</BaseButton
             >
+              X
+            </BaseButton>
           </li>
         </ul>
       </div>
@@ -78,8 +80,9 @@
             @click="addDaughterLocally"
             variant="primary"
             class="add-button"
-            >+</BaseButton
           >
+            +
+          </BaseButton>
         </div>
         <ul>
           <li v-for="(daughter, i) in newDaughters" :key="i" class="list-item">
@@ -88,16 +91,17 @@
               @click="removeDaughterLocally(i)"
               variant="danger"
               class="remove-button"
-              >X</BaseButton
             >
+              X
+            </BaseButton>
           </li>
         </ul>
       </div>
 
       <div class="button-group">
-        <BaseButton @click="confirmImmediateFamily" variant="primary"
-          >Create Family</BaseButton
-        >
+        <BaseButton @click="confirmImmediateFamily" variant="primary">
+          Create Family
+        </BaseButton>
         <BaseButton @click="cancel" variant="danger">Cancel</BaseButton>
       </div>
     </div>
@@ -114,9 +118,9 @@
         <input type="text" v-model="motherName" />
       </div>
       <div class="button-group">
-        <BaseButton @click="confirmAncestralFamily" variant="primary"
-          >Create Ancestral Family</BaseButton
-        >
+        <BaseButton @click="confirmAncestralFamily" variant="primary">
+          Create Ancestral Family
+        </BaseButton>
         <BaseButton @click="cancel" variant="danger">Cancel</BaseButton>
       </div>
     </div>
@@ -152,7 +156,7 @@ const {
   resetForm,
 } = useFamilyForm();
 
-// New state for the dropdown and for awaiting second person selection.
+// New state for the dropdown and awaiting second person selection.
 const selectedFamilyOption = ref("");
 const awaitSecondPerson = ref(false);
 const showImmediateFamilyForm = ref(false);
@@ -174,7 +178,7 @@ function handleOptionSelection() {
     console.log("Ancestral Family option selected.");
   } else if (selectedFamilyOption.value === "existing") {
     awaitSecondPerson.value = true;
-    window.awaitSecondPerson = true; // Set the global flag for FamilyChart to detect.
+    window.awaitSecondPerson = true; // Global flag for FamilyChart to detect.
     emit("await-second-person", true);
     showImmediateFamilyForm.value = false;
     showAncestralFamilyForm.value = false;
@@ -187,7 +191,7 @@ function handleOptionSelection() {
 function cancelExistingFamily() {
   console.log("Cancel existing family option.");
   awaitSecondPerson.value = false;
-  window.awaitSecondPerson = false; // Reset global flag.
+  window.awaitSecondPerson = false;
   emit("await-second-person", false);
   selectedFamilyOption.value = "";
 }
@@ -233,13 +237,14 @@ function onSecondPersonSelected(secondPerson) {
   console.log("Second person selected:", secondPerson);
   createFamilyFromNodes(props.personData, secondPerson);
   awaitSecondPerson.value = false;
-  window.awaitSecondPerson = false; // Reset global flag.
+  window.awaitSecondPerson = false;
   emit("await-second-person", false);
   emit("close");
   resetForm();
 }
 
 // Example function: Create a family node from two person nodes.
+// Replace the sequential family id creation with store.getNewFamilyId()
 function createFamilyFromNodes(person1, person2) {
   let husbandId, wifeId;
   if (person1.gender === "male" && person2.gender === "female") {
@@ -253,7 +258,7 @@ function createFamilyFromNodes(person1, person2) {
     husbandId = person1.id;
     wifeId = person2.id;
   }
-  const familyId = `family-${Date.now()}`;
+  const familyId = store.getNewFamilyId();
   const newFamily = {
     id: familyId,
     husbandId,
@@ -278,8 +283,7 @@ function createFamilyFromNodes(person1, person2) {
   store.edges.push({
     data: { source: wifeId, target: familyId, label: "Wife" },
   });
-
-  // If your chart is reactive (watching store.families/nodes/edges), it should now update automatically.
+  // Reactive updates in your chart will pick up the new family.
 }
 
 onMounted(() => {
@@ -297,6 +301,100 @@ onUnmounted(() => {
     secondPersonEventHandler
   );
 });
+
+function saveChanges() {
+  if (!props.familyData) return;
+  const fam = store.families.find((f) => f.id === props.familyData.id);
+  if (!fam) return;
+
+  // Update parents.
+  // For Husband: if localHusbandName is provided, check if a parent exists.
+  let husband = store.persons.find(
+    (p) => p.gender === "male" && p.name === localHusbandName.value
+  );
+  if (!husband && localHusbandName.value) {
+    const newId = store.getNewPersonId();
+    husband = { id: newId, name: localHusbandName.value, gender: "male" };
+    store.persons.push(husband);
+    store.nodes.push({
+      data: { id: newId, label: husband.name, gender: husband.gender },
+    });
+    fam.members.push({ personId: newId, relationship: "parent" });
+    store.edges.push({
+      data: { source: newId, target: fam.id, label: "Father" },
+    });
+  } else if (husband) {
+    husband.name = localHusbandName.value;
+  }
+
+  let wife = store.persons.find(
+    (p) => p.gender === "female" && p.name === localWifeName.value
+  );
+  if (!wife && localWifeName.value) {
+    const newId = store.getNewPersonId();
+    wife = { id: newId, name: localWifeName.value, gender: "female" };
+    store.persons.push(wife);
+    store.nodes.push({
+      data: { id: newId, label: wife.name, gender: wife.gender },
+    });
+    fam.members.push({ personId: newId, relationship: "parent" });
+    store.edges.push({
+      data: { source: newId, target: fam.id, label: "Mother" },
+    });
+  } else if (wife) {
+    wife.name = localWifeName.value;
+  }
+
+  // Process new children from localSons.
+  localSons.value.forEach((child) => {
+    if (child.id.startsWith("temp-")) {
+      const newId = store.getNewPersonId();
+      const newChild = { id: newId, name: child.name, gender: child.gender };
+      store.persons.push(newChild);
+      store.nodes.push({
+        data: { id: newId, label: newChild.name, gender: newChild.gender },
+      });
+      fam.members.push({ personId: newId, relationship: "child" });
+      store.edges.push({
+        data: {
+          source: fam.id,
+          target: newId,
+          label: child.gender === "male" ? "Son" : "Daughter",
+        },
+      });
+      child.id = newId; // update temporary id
+    }
+  });
+  // Process new children from localDaughters.
+  localDaughters.value.forEach((child) => {
+    if (child.id.startsWith("temp-")) {
+      const newId = store.getNewPersonId();
+      const newChild = { id: newId, name: child.name, gender: child.gender };
+      store.persons.push(newChild);
+      store.nodes.push({
+        data: { id: newId, label: newChild.name, gender: newChild.gender },
+      });
+      fam.members.push({ personId: newId, relationship: "child" });
+      store.edges.push({
+        data: {
+          source: fam.id,
+          target: newId,
+          label: child.gender === "male" ? "Son" : "Daughter",
+        },
+      });
+      child.id = newId;
+    }
+  });
+
+  isEditing.value = false;
+  loadFamily(props.familyData.id);
+}
+
+function cancelEdit() {
+  isEditing.value = false;
+  if (props.familyData) loadFamily(props.familyData.id);
+  emit("close");
+}
 </script>
 
 <style scoped>

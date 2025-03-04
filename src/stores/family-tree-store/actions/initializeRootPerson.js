@@ -7,7 +7,7 @@ export function initializeRootPerson(rootPerson, enableLogging = false) {
     return;
   }
 
-  const rootId = "person-1";
+  const rootId = this.getNewPersonId();
   this.rootPerson = { id: rootId, ...rootPerson };
   this.persons.push(this.rootPerson);
   this.nodes.push({

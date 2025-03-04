@@ -7,10 +7,14 @@ import { addPerson } from "./actions/addPerson.js";
 import { importPersons } from "./actions/importPersons.js";
 import { addFamilyMembers } from "./actions/addFamilyMembers.js";
 import debug from "debug";
+import { customAlphabet } from "nanoid";
 
 const logLoad = debug("familyTree:load");
 const logTransform = debug("familyTree:transform");
 const logSave = debug("familyTree:save");
+
+// Create an 16-character ID generator using lowercase alphanumerics.
+const nanoid = customAlphabet("abcdefghijklmnopqrstuvwxyz0123456789", 16);
 
 /**
  * Compute max generation with a BFS approach.
@@ -289,6 +293,13 @@ export const useFamilyTreeStore = defineStore("familyTree", {
     // New action: Calculate generation mapping.
     calculateGenerationMapping() {
       return computeMaxGenerationBFS(this.persons, this.families, this.edges);
+    },
+    // New methods for generating IDs.
+    getNewFamilyId() {
+      return nanoid();
+    },
+    getNewPersonId() {
+      return nanoid();
     },
   },
 });

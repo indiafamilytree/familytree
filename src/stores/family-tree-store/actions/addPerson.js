@@ -25,7 +25,7 @@ export function addPerson(person, enableLogging = false) {
     return;
   }
 
-  const newId = `person-${this.persons.length + 1}`;
+  const newId = this.getNewPersonId();
   const newPerson = { id: newId, ...person };
   this.persons.push(newPerson);
   this.nodes.push({

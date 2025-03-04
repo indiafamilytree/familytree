@@ -38,7 +38,8 @@ export function useFamilyForm() {
   function createImmediateFamily(person) {
     if (!person) return;
 
-    let familyId = `family-${familyTreeStore.families.length + 1}`;
+    // Generate a new family id using the store method.
+    let familyId = familyTreeStore.getNewFamilyId();
     familyTreeStore.families.push({
       id: familyId,
       husbandId: null,
@@ -65,7 +66,7 @@ export function useFamilyForm() {
     // (2) If spouseName is given, add spouse with label “Husband” or “Wife”
     let spouseId = null;
     if (spouseName.value) {
-      spouseId = `person-${familyTreeStore.persons.length + 1}`;
+      spouseId = familyTreeStore.getNewPersonId();
       const spouseGender = person.gender === "male" ? "female" : "male";
       const spouseRelation = person.gender === "male" ? "Wife" : "Husband";
 
@@ -147,7 +148,6 @@ export function useFamilyForm() {
   }
 
   // Create an ancestral family for a single "person" => father & mother
-
   function createAncestralFamily(person) {
     if (!person) return;
 
@@ -156,12 +156,12 @@ export function useFamilyForm() {
 
     // If fatherName was provided, create a father
     if (fatherName.value) {
-      fatherId = `person-${familyTreeStore.persons.length + 1}`;
+      fatherId = familyTreeStore.getNewPersonId();
       familyTreeStore.persons.push({
         id: fatherId,
         name: fatherName.value,
         gender: "male",
-        familyLinks: [], // if using familyLinks elsewhere
+        familyLinks: [],
       });
       familyTreeStore.nodes.push({
         data: { id: fatherId, label: fatherName.value, gender: "male" },
@@ -169,7 +169,7 @@ export function useFamilyForm() {
     }
     // If motherName was provided, create a mother
     if (motherName.value) {
-      motherId = `person-${familyTreeStore.persons.length + 1}`;
+      motherId = familyTreeStore.getNewPersonId();
       familyTreeStore.persons.push({
         id: motherId,
         name: motherName.value,
@@ -181,29 +181,42 @@ export function useFamilyForm() {
       });
     }
 
-    // Create a new family with explicit fields
-    const newFamilyId = `family-${familyTreeStore.families.length + 1}`;
+    // Create a new family with explicit fields and default members array.
+    const newFamilyId = familyTreeStore.getNewFamilyId();
     const newFamily = {
       id: newFamilyId,
       husbandId: fatherId,
       wifeId: motherId,
       sons: [],
       daughters: [],
+      members: [], // added default members property
     };
     familyTreeStore.families.push(newFamily);
     familyTreeStore.nodes.push({
       data: { id: newFamilyId, label: "Family", isFamily: true },
     });
 
-    // Add the person as a child to this ancestral family
+    // Add father and mother to the members array if they exist.
+    if (fatherId) {
+      newFamily.members.push({ personId: fatherId, relationship: "parent" });
+    }
+    if (motherId) {
+      newFamily.members.push({ personId: motherId, relationship: "parent" });
+    }
+
+    // Add the person as a child to this ancestral family.
     if (person.gender === "male") {
       newFamily.sons.push(person.id);
     } else {
       newFamily.daughters.push(person.id);
     }
+    newFamily.members.push({
+      personId: person.id,
+      relationship: "child",
+    });
 
     // Create the child edge with reversed direction:
-    // For ancestral families, the edge should go from the family node to the person.
+    // For ancestral families, the edge goes from the family node to the person.
     familyTreeStore.edges.push({
       data: {
         source: newFamilyId, // from family node
@@ -254,13 +267,11 @@ export function useFamilyForm() {
     newDaughters,
     tempSonName,
     tempDaughterName,
-
     addSonLocally: () => addSonLocally(newSons, "male"),
     removeSonLocally: (index) => removeSonLocally(newSons, index),
     addDaughterLocally: () => addDaughterLocally(newDaughters, "female"),
     removeDaughterLocally: (index) =>
       removeDaughterLocally(newDaughters, index),
-
     createImmediateFamily,
     createAncestralFamily,
     resetForm,
