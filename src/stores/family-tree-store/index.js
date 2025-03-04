@@ -12,6 +12,74 @@ const logLoad = debug("familyTree:load");
 const logTransform = debug("familyTree:transform");
 const logSave = debug("familyTree:save");
 
+/**
+ * Compute max generation with a BFS approach.
+ * 1) Identify ancestors (never appear as a "child" in any family).
+ * 2) Build adjacency from person -> children.
+ * 3) BFS from each ancestor, assigning child.generation = parent.generation + 1.
+ * 4) Track the maximum generation found.
+ *
+ * @param {Array} persons - each person has { id, name, gender }
+ * @param {Array} families - each family has { id, members: [ { personId, relationship } ] }
+ * @returns {Number} the maximum generation found
+ */
+function computeMaxGenerationBFS(persons, families) {
+  // 1) Identify childSet so we can find ancestors.
+  const childSet = new Set();
+  families.forEach((fam) => {
+    fam.members
+      .filter((m) => m.relationship === "child")
+      .forEach((m) => childSet.add(m.personId));
+  });
+
+  // 2) Build adjacency: person -> array of child personIds
+  //    If person is a "parent" in a family, then each "child" in that family is appended to adjacency[personId].
+  const adjacency = {}; // e.g. adjacency["person-1"] = ["person-3", "person-4"]
+  persons.forEach((p) => {
+    adjacency[p.id] = []; // initialize empty
+  });
+  families.forEach((fam) => {
+    const parentIds = fam.members
+      .filter((m) => m.relationship === "parent")
+      .map((m) => m.personId);
+    const childIds = fam.members
+      .filter((m) => m.relationship === "child")
+      .map((m) => m.personId);
+
+    // For each parent, push all childIds into adjacency
+    parentIds.forEach((parentId) => {
+      adjacency[parentId].push(...childIds);
+    });
+  });
+
+  // 3) BFS from each ancestor (person not in childSet) to assign generation
+  let maxGeneration = 1;
+  const generationMap = {}; // optional, if you want to store each person's generation
+
+  const ancestors = persons.filter((p) => !childSet.has(p.id));
+  for (const ancestor of ancestors) {
+    // BFS queue: store objects { personId, generation }
+    const queue = [{ personId: ancestor.id, generation: 1 }];
+    while (queue.length) {
+      const { personId, generation } = queue.shift();
+      // If we already have a generation assigned that's >= current, skip
+      if (generationMap[personId] && generationMap[personId] >= generation) {
+        continue;
+      }
+      generationMap[personId] = generation;
+      if (generation > maxGeneration) {
+        maxGeneration = generation;
+      }
+      // Enqueue children with generation+1
+      adjacency[personId].forEach((childId) => {
+        queue.push({ personId: childId, generation: generation + 1 });
+      });
+    }
+  }
+
+  return maxGeneration;
+}
+
 export const useFamilyTreeStore = defineStore("familyTree", {
   state: () => ({
     persons: [],
@@ -94,9 +162,6 @@ export const useFamilyTreeStore = defineStore("familyTree", {
       }));
 
       // Build edges based on family members.
-      // For each family, for each member, create an edge:
-      // - If the member's relationship is "parent": edge from Person -> Family (with label based on gender)
-      // - If "child": edge from Family -> Person (with label based on gender)
       const edges = [];
       families.forEach((f) => {
         f.members.forEach((member) => {
@@ -124,7 +189,6 @@ export const useFamilyTreeStore = defineStore("familyTree", {
               },
             });
           } else {
-            // Fallback: simply use the stored relationship.
             edges.push({
               data: {
                 source: person.id,
@@ -147,6 +211,7 @@ export const useFamilyTreeStore = defineStore("familyTree", {
       }
       logTransform("Store state updated.");
     },
+
     async saveTreeToS3() {
       try {
         logSave("Starting save process.");
@@ -165,15 +230,13 @@ export const useFamilyTreeStore = defineStore("familyTree", {
         }));
 
         // Transform Families:
-        // For each family, if its members array is empty, we rebuild it from the edges.
+        // For each family, if its members array is empty, rebuild it from the edges.
         const families = this.families.map((family) => {
           let members = [];
           if (family.members && family.members.length > 0) {
             members = family.members;
           } else {
-            // Rebuild members from store edges.
             this.edges.forEach((edge) => {
-              // If edge goes from a person node to the family node, treat it as a "parent" link.
               if (
                 edge.data.target === family.id &&
                 edge.data.source.startsWith("person")
@@ -183,7 +246,6 @@ export const useFamilyTreeStore = defineStore("familyTree", {
                   relationship: "parent",
                 });
               }
-              // If edge goes from the family node to a person node, treat it as a "child" link.
               if (
                 edge.data.source === family.id &&
                 edge.data.target.startsWith("person")
@@ -194,7 +256,6 @@ export const useFamilyTreeStore = defineStore("familyTree", {
                 });
               }
             });
-            // Remove duplicates (if any) by personId.
             members = Array.from(
               new Map(members.map((m) => [m.personId, m])).values()
             );
@@ -223,6 +284,11 @@ export const useFamilyTreeStore = defineStore("familyTree", {
       } catch (error) {
         logSave("Error saving family tree to S3:", error);
       }
+    },
+
+    // New action: Calculate generation mapping.
+    calculateGenerationMapping() {
+      return computeMaxGenerationBFS(this.persons, this.families, this.edges);
     },
   },
 });

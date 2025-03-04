@@ -36,6 +36,10 @@
         <span class="stat-label">Males:</span>
         <span class="stat-number">{{ maleCount }}</span>
       </div>
+      <div class="stat-item generation">
+        <span class="stat-label">Generation:</span>
+        <span class="stat-number">{{ generationStats }}</span>
+      </div>
     </div>
   </div>
 </template>
@@ -68,6 +72,10 @@ const femaleCount = computed(
 const maleCount = computed(
   () => familyTreeStore.persons.filter((p) => p.gender === "male").length
 );
+const generationStats = computed(() => {
+  // calculateGenerationMapping returns an object with generationMap and maxGeneration.
+  return familyTreeStore.calculateGenerationMapping();
+});
 
 // --- Layout Configurations ---
 const compoundLayoutConfig = {
@@ -452,6 +460,9 @@ function exportAsSVG() {
 }
 .stat-item.males {
   background-color: #e8f5e9;
+}
+.stat-item.generation {
+  background-color: #f5f1e8;
 }
 .stat-number {
   font-weight: 700;
