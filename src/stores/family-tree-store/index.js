@@ -141,7 +141,7 @@ export const useFamilyTreeStore = defineStore("familyTree", {
     transformAmplifyDataToStore(amplifyData) {
       logTransform("Starting transformation of new model format.");
 
-      // Map Persons: use "personId" as id and "firstName" as name.
+      // Map Persons
       const persons = amplifyData.Persons.map((p) => ({
         id: p.personId,
         name: p.firstName,
@@ -153,11 +153,11 @@ export const useFamilyTreeStore = defineStore("familyTree", {
         data: { id: p.id, label: p.name, gender: p.gender },
       }));
 
-      // Map Families: each family now has a "familyId", "familySignature", and "members" array.
+      // Map Families: parse the stored members JSON string back into an array.
       const families = amplifyData.Families.map((f) => ({
         id: f.familyId,
         familySignature: f.familySignature || "",
-        members: f.members || [], // Each member is { personId, relationship }
+        members: f.members ? JSON.parse(f.members) : [], // Convert back to array
       }));
       logTransform("Mapped families:", families);
 
@@ -215,7 +215,6 @@ export const useFamilyTreeStore = defineStore("familyTree", {
       }
       logTransform("Store state updated.");
     },
-
     async saveTreeToS3() {
       try {
         logSave("Starting save process.");
@@ -226,20 +225,20 @@ export const useFamilyTreeStore = defineStore("familyTree", {
         const path = `entity-files/${userId}/amplify-tree.json`;
         logSave("S3 path:", path);
 
-        // Transform Persons: Map store persons to new format.
+        // Transform Persons
         const persons = this.persons.map((person) => ({
           personId: person.id,
           firstName: person.name,
           gender: person.gender,
         }));
 
-        // Transform Families:
-        // For each family, if its members array is empty, rebuild it from the edges.
+        // Transform Families
         const families = this.families.map((family) => {
           let members = [];
           if (family.members && family.members.length > 0) {
             members = family.members;
           } else {
+            // Optionally rebuild from edges if needed
             this.edges.forEach((edge) => {
               if (
                 edge.data.target === family.id &&
@@ -260,6 +259,7 @@ export const useFamilyTreeStore = defineStore("familyTree", {
                 });
               }
             });
+            // Remove duplicates if needed.
             members = Array.from(
               new Map(members.map((m) => [m.personId, m])).values()
             );
@@ -267,7 +267,7 @@ export const useFamilyTreeStore = defineStore("familyTree", {
           return {
             familyId: family.id,
             familySignature: family.familySignature || "",
-            members,
+            members: JSON.stringify(members), // Convert members array to a JSON string
           };
         });
 
@@ -289,7 +289,6 @@ export const useFamilyTreeStore = defineStore("familyTree", {
         logSave("Error saving family tree to S3:", error);
       }
     },
-
     // New action: Calculate generation mapping.
     calculateGenerationMapping() {
       return computeMaxGenerationBFS(this.persons, this.families, this.edges);

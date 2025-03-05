@@ -1,7 +1,7 @@
-// stores/family-tree-store/actions/initializeRootPerson.js
-export function initializeRootPerson(rootPerson, enableLogging = false) {
-  const isDevelopment = enableLogging;
+// src/stores/family-tree-store/actions/initializeRootPerson.js
+import { createPerson } from "@/services/dataService";
 
+export async function initializeRootPerson(rootPerson, enableLogging = false) {
   if (!rootPerson || !rootPerson.name || !rootPerson.gender) {
     console.error("Invalid root person data:", rootPerson);
     return;
@@ -14,7 +14,23 @@ export function initializeRootPerson(rootPerson, enableLogging = false) {
     data: { id: rootId, label: rootPerson.name, gender: rootPerson.gender },
   });
 
-  if (isDevelopment) {
+  // Immediately persist the root person to the backend.
+  try {
+    const { errors, data } = await createPerson({
+      personId: rootId,
+      firstName: rootPerson.name,
+      gender: rootPerson.gender,
+    });
+    if (errors && errors.length > 0) {
+      console.error("Error creating root person in backend:", errors);
+    } else {
+      console.log("Created root person in backend:", data);
+    }
+  } catch (error) {
+    console.error("Error during backend call for root person:", error);
+  }
+
+  if (enableLogging) {
     console.log("initializeRootPerson:");
     console.log("   Current persons:", this.persons);
     console.log("   Current families:", this.families);

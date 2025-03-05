@@ -1,4 +1,4 @@
-<!-- filepath: /Users/nkannaiyan/Code/ChatGPTApps/FamilyTree/family-tree-app/src/components/PersonForm.vue -->
+<!-- ./src/components/PersonForm.vue -->
 <template>
   <div class="person-form">
     <form @submit.prevent="addPerson" class="form-layout">
@@ -30,15 +30,12 @@ import { useFamilyTreeStore } from "@/stores/family-tree-store/index";
 import BaseButton from "@/components/BaseButton.vue";
 
 const store = useFamilyTreeStore();
-const persons = computed(() => store.persons);
-const families = computed(() => store.families);
-
 const name = ref("");
 const gender = ref("male");
 
-function addPerson() {
-  // Initialize the root person
-  store.initializeRootPerson({
+async function addPerson() {
+  // Await the asynchronous initialization of the root person.
+  await store.initializeRootPerson({
     name: name.value,
     gender: gender.value,
   });

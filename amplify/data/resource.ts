@@ -23,10 +23,7 @@ const schema = a.schema({
     .model({
       familyId: a.string(),
       familySignature: a.string(),
-      members: a.customType({
-        personId: a.string().required(),
-        relationship: a.string().required(),
-      }),
+      members: a.string(), // Store members as a JSON string
     })
     .authorization((allow) => [allow.owner()]),
 });

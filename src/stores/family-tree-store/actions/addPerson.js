@@ -7,8 +7,9 @@ import {
   addHusband,
 } from "./relations/index.js";
 import { addFamilyAndEdges } from "../utils/addFamilyAndEdges.js";
+import { createPerson } from "@/services/dataService.js";
 
-export function addPerson(person, enableLogging = false) {
+export async function addPerson(person, enableLogging = false) {
   const isDevelopment = enableLogging;
 
   if (!person) {
@@ -57,6 +58,22 @@ export function addPerson(person, enableLogging = false) {
       enableLogging,
       person.linkedFamilyId
     );
+  }
+
+  // Persist the new person to the backend
+  try {
+    const { errors, data } = await createPerson({
+      personId: newPerson.id,
+      firstName: newPerson.name,
+      gender: newPerson.gender,
+    });
+    if (errors && errors.length > 0) {
+      console.error("Error creating Person in backend:", errors);
+    } else {
+      console.log("Created Person in backend:", data);
+    }
+  } catch (error) {
+    console.error("Error during backend call for Person:", error);
   }
 
   if (isDevelopment) {
