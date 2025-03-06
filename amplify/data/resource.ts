@@ -14,7 +14,7 @@ const schema = a.schema({
   Persons: a
     .model({
       personId: a.string(),
-      firstName: a.string(),
+      name: a.string(),
       gender: a.string(),
     })
     .authorization((allow) => [allow.owner()]),

@@ -16,9 +16,8 @@
             @click="saveHusband"
             variant="primary"
             class="save-button"
+            >✓</BaseButton
           >
-            ✓
-          </BaseButton>
         </div>
       </div>
       <div class="form-group">
@@ -34,9 +33,8 @@
             @click="saveWife"
             variant="primary"
             class="save-button"
+            >✓</BaseButton
           >
-            ✓
-          </BaseButton>
         </div>
       </div>
 
@@ -56,16 +54,14 @@
                 @click="saveChild(son)"
                 variant="primary"
                 class="save-button"
+                >✓</BaseButton
               >
-                ✓
-              </BaseButton>
               <BaseButton
                 @click="removeChild(son.id, 'male')"
                 variant="danger"
                 class="remove-button"
+                >X</BaseButton
               >
-                X
-              </BaseButton>
             </div>
           </li>
         </ul>
@@ -80,9 +76,8 @@
             @click="addNewChild('male')"
             variant="primary"
             class="add-button"
+            >+</BaseButton
           >
-            +
-          </BaseButton>
         </div>
       </div>
       <div class="form-group">
@@ -104,16 +99,14 @@
                 @click="saveChild(daughter)"
                 variant="primary"
                 class="save-button"
+                >✓</BaseButton
               >
-                ✓
-              </BaseButton>
               <BaseButton
                 @click="removeChild(daughter.id, 'female')"
                 variant="danger"
                 class="remove-button"
+                >X</BaseButton
               >
-                X
-              </BaseButton>
             </div>
           </li>
         </ul>
@@ -128,9 +121,8 @@
             @click="addNewChild('female')"
             variant="primary"
             class="add-button"
+            >+</BaseButton
           >
-            +
-          </BaseButton>
         </div>
       </div>
 
@@ -141,25 +133,22 @@
           @click="isEditing = true"
           variant="secondary"
           class="edit-button"
+          >Edit</BaseButton
         >
-          Edit
-        </BaseButton>
         <BaseButton
           v-if="isEditing"
           @click="saveChanges"
           variant="primary"
           class="save-button"
+          >Save</BaseButton
         >
-          Save
-        </BaseButton>
         <BaseButton
           v-if="isEditing"
           @click="cancelEdit"
           variant="danger"
           class="cancel-button"
+          >Cancel</BaseButton
         >
-          Cancel
-        </BaseButton>
       </div>
     </div>
     <div v-else>
@@ -172,12 +161,6 @@
 import { ref, watch, defineProps, defineEmits } from "vue";
 import { useFamilyTreeStore } from "@/stores/family-tree-store/index";
 import BaseButton from "@/components/BaseButton.vue";
-// Import both update and create functions from your data service.
-import {
-  createPerson,
-  updatePerson,
-  updateFamily,
-} from "@/services/dataService.js";
 
 const props = defineProps({
   familyData: { type: Object, required: false },
@@ -189,12 +172,12 @@ const store = useFamilyTreeStore();
 const isEditing = ref(false);
 const localHusbandName = ref("");
 const localWifeName = ref("");
-const localSons = ref([]); // Array of male children objects
-const localDaughters = ref([]); // Array of female children objects
+const localSons = ref([]);
+const localDaughters = ref([]);
 const tempSonName = ref("");
 const tempDaughterName = ref("");
 
-// When familyData changes, load the family details.
+// Load family data when familyData prop changes.
 watch(
   () => props.familyData,
   (val) => {
@@ -208,7 +191,6 @@ watch(
 function loadFamily(familyId) {
   const fam = store.families.find((f) => f.id === familyId);
   if (!fam) return;
-  // If stored members is a JSON string, parse it; otherwise, use it.
   let members = [];
   if (typeof fam.members === "string") {
     try {
@@ -222,14 +204,12 @@ function loadFamily(familyId) {
   const parentMembers = members.filter((m) => m.relationship === "parent");
   const childMembers = members.filter((m) => m.relationship === "child");
 
-  // Update local parent names.
   const parents = parentMembers
     .map((m) => store.persons.find((p) => p.id === m.personId))
     .filter(Boolean);
   localHusbandName.value = parents.find((p) => p.gender === "male")?.name || "";
   localWifeName.value = parents.find((p) => p.gender === "female")?.name || "";
 
-  // Update local children arrays.
   const children = childMembers
     .map((m) => store.persons.find((p) => p.id === m.personId))
     .filter(Boolean);
@@ -265,29 +245,14 @@ function removeChild(childId, gender) {
       (child) => child.id !== childId
     );
   }
-  // Optionally, remove the child from the store if needed.
 }
 
 async function saveChild(child) {
-  // For an individual child edit, update the corresponding store person.
   const person = store.persons.find((p) => p.id === child.id);
   if (person) {
     person.name = child.name;
     const node = store.nodes.find((n) => n.data.id === person.id);
     if (node) node.data.label = child.name;
-    // If the child already exists (id doesn't start with "temp-"), update.
-    if (!child.id.startsWith("temp-")) {
-      try {
-        await updatePerson({
-          personId: child.id,
-          firstName: child.name,
-          gender: child.gender,
-        });
-        console.log("Child updated in backend:", child.id);
-      } catch (error) {
-        console.error("Error updating child:", error);
-      }
-    }
   }
 }
 
@@ -296,7 +261,7 @@ async function saveChanges() {
   const fam = store.families.find((f) => f.id === props.familyData.id);
   if (!fam) return;
 
-  // Update parent records.
+  // Update parents.
   let husband = store.persons.find(
     (p) => p.gender === "male" && p.name === localHusbandName.value
   );
@@ -311,26 +276,8 @@ async function saveChanges() {
     store.edges.push({
       data: { source: newId, target: fam.id, label: "Father" },
     });
-    try {
-      await createPerson({
-        personId: newId,
-        firstName: husband.name,
-        gender: "male",
-      });
-    } catch (e) {
-      console.error("Error creating husband:", e);
-    }
   } else if (husband) {
     husband.name = localHusbandName.value;
-    try {
-      await updatePerson({
-        personId: husband.id,
-        firstName: husband.name,
-        gender: "male",
-      });
-    } catch (e) {
-      console.error("Error updating husband:", e);
-    }
   }
 
   let wife = store.persons.find(
@@ -347,32 +294,13 @@ async function saveChanges() {
     store.edges.push({
       data: { source: newId, target: fam.id, label: "Mother" },
     });
-    try {
-      await createPerson({
-        personId: newId,
-        firstName: wife.name,
-        gender: "female",
-      });
-    } catch (e) {
-      console.error("Error creating wife:", e);
-    }
   } else if (wife) {
     wife.name = localWifeName.value;
-    try {
-      await updatePerson({
-        personId: wife.id,
-        firstName: wife.name,
-        gender: "female",
-      });
-    } catch (e) {
-      console.error("Error updating wife:", e);
-    }
   }
 
   // Process new children from localSons.
   for (const child of localSons.value) {
     if (child.id.startsWith("temp-")) {
-      // New child: create it.
       const newId = store.getNewPersonId();
       const newChild = { id: newId, name: child.name, gender: child.gender };
       store.persons.push(newChild);
@@ -383,28 +311,8 @@ async function saveChanges() {
       store.edges.push({
         data: { source: fam.id, target: newId, label: "Son" },
       });
-      child.id = newId; // update temporary id
-      try {
-        await createPerson({
-          personId: newId,
-          firstName: newChild.name,
-          gender: newChild.gender,
-        });
-        console.log("New son created in backend:", newId);
-      } catch (e) {
-        console.error("Error creating new son:", e);
-      }
+      child.id = newId;
     } else {
-      // Existing child: update.
-      try {
-        await updatePerson({
-          personId: child.id,
-          firstName: child.name,
-          gender: child.gender,
-        });
-      } catch (e) {
-        console.error("Error updating existing son:", e);
-      }
     }
   }
 
@@ -422,46 +330,12 @@ async function saveChanges() {
         data: { source: fam.id, target: newId, label: "Daughter" },
       });
       child.id = newId;
-      try {
-        await createPerson({
-          personId: newId,
-          firstName: newChild.name,
-          gender: newChild.gender,
-        });
-        console.log("New daughter created in backend:", newId);
-      } catch (e) {
-        console.error("Error creating new daughter:", e);
-      }
     } else {
-      try {
-        await updatePerson({
-          personId: child.id,
-          firstName: child.name,
-          gender: child.gender,
-        });
-      } catch (e) {
-        console.error("Error updating existing daughter:", e);
-      }
     }
   }
 
   isEditing.value = false;
   loadFamily(props.familyData.id);
-
-  // Persist the updated family record to the backend.
-  try {
-    await updateFamily({
-      familyId: fam.id,
-      familySignature: fam.familySignature || "",
-      members: JSON.stringify(fam.members),
-    });
-    console.log("Family updated in backend:", fam.id);
-  } catch (err) {
-    console.error("Error updating family in backend:", err);
-  }
-
-  // Optionally, emit close event.
-  // emit("close");
 }
 
 function cancelEdit() {

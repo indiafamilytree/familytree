@@ -2,7 +2,6 @@
 import { ref } from "vue";
 import { useFamilyTreeStore } from "@/stores/family-tree-store/index";
 import { useArrayManipulation } from "@/utils/arrayUtils";
-import { createPerson, createFamily } from "@/services/dataService.js";
 
 export function useFamilyForm() {
   const familyTreeStore = useFamilyTreeStore();
@@ -81,20 +80,6 @@ export function useFamilyForm() {
       familyTreeStore.edges.push({
         data: { source: spouseId, target: familyId, label: spouseRelation },
       });
-      try {
-        const { errors, data } = await createPerson({
-          personId: spouseId,
-          firstName: spouseName.value,
-          gender: spouseGender,
-        });
-        if (errors && errors.length > 0) {
-          console.error("Error creating spouse in backend:", errors);
-        } else {
-          console.log("Spouse created in backend:", data);
-        }
-      } catch (error) {
-        console.error("Error during createPerson for spouse:", error);
-      }
     }
 
     // (3) Update family parent's IDs and add them to members.
@@ -135,22 +120,16 @@ export function useFamilyForm() {
       familyTreeStore.nodes.push({
         data: { id: childId, label: child.name, gender: child.gender },
       });
-      try {
-        const { errors } = await createPerson({
-          personId: childId,
-          firstName: child.name,
-          gender: child.gender,
-        });
-        if (errors && errors.length > 0) {
-          console.error("Error creating child (son) in backend:", errors);
-        } else {
-          console.log("Child (son) created in backend:", child);
-        }
-      } catch (error) {
-        console.error("Error during createPerson for child (son):", error);
-      }
+
       familyRecord.sons.push(childId);
       familyRecord.members.push({ personId: childId, relationship: "child" });
+      familyTreeStore.edges.push({
+        data: {
+          source: familyId,
+          target: childId,
+          label: "Son",
+        },
+      });
     }
     // For each daughter in newDaughters, create a child record.
     for (const daughter of newDaughters.value) {
@@ -164,22 +143,15 @@ export function useFamilyForm() {
       familyTreeStore.nodes.push({
         data: { id: childId, label: child.name, gender: child.gender },
       });
-      try {
-        const { errors } = await createPerson({
-          personId: childId,
-          firstName: child.name,
-          gender: child.gender,
-        });
-        if (errors && errors.length > 0) {
-          console.error("Error creating child (daughter) in backend:", errors);
-        } else {
-          console.log("Child (daughter) created in backend:", child);
-        }
-      } catch (error) {
-        console.error("Error during createPerson for child (daughter):", error);
-      }
       familyRecord.daughters.push(childId);
       familyRecord.members.push({ personId: childId, relationship: "child" });
+      familyTreeStore.edges.push({
+        data: {
+          source: familyId,
+          target: childId,
+          label: "Daughter",
+        },
+      });
     }
 
     // (5) If children exist, update edge labels from "Husband"/"Wife" to "Father"/"Mother".
@@ -207,23 +179,6 @@ export function useFamilyForm() {
         }
       }
     }
-
-    // (6) Persist the family record to the backend.
-    // Since your schema expects members as a JSON string, we stringify it.
-    try {
-      const { errors, data } = await createFamily({
-        familyId: familyRecord.id,
-        familySignature: "", // add a signature if needed
-        members: JSON.stringify(familyRecord.members),
-      });
-      if (errors && errors.length > 0) {
-        console.error("Error creating family in backend:", errors);
-      } else {
-        console.log("Family created in backend:", data);
-      }
-    } catch (error) {
-      console.error("Error during createFamily for immediate family:", error);
-    }
   }
 
   // -------------------------------
@@ -233,10 +188,15 @@ export function useFamilyForm() {
   async function createAncestralFamily(person) {
     if (!person) return;
 
+    console.log("Creating ancestral family:", {
+      fatherName: fatherName.value,
+      motherName: motherName.value,
+    });
+
     let fatherId = null;
     let motherId = null;
 
-    if (fatherName.value) {
+    if (fatherName.value && fatherName.value.trim() !== "") {
       fatherId = familyTreeStore.getNewPersonId();
       const fatherObj = {
         id: fatherId,
@@ -248,23 +208,12 @@ export function useFamilyForm() {
       familyTreeStore.nodes.push({
         data: { id: fatherId, label: fatherName.value, gender: "male" },
       });
-      try {
-        const { errors } = await createPerson({
-          personId: fatherId,
-          firstName: fatherName.value,
-          gender: "male",
-        });
-        if (errors && errors.length > 0) {
-          console.error("Error creating father in backend:", errors);
-        } else {
-          console.log("Father created in backend");
-        }
-      } catch (error) {
-        console.error("Error during createPerson for father:", error);
-      }
     }
 
-    if (motherName.value) {
+    console.log("processing motherName:", motherName.value);
+
+    if (motherName.value && motherName.value.trim() !== "") {
+      console.log("Entering mother branch, motherName:", motherName.value);
       motherId = familyTreeStore.getNewPersonId();
       const motherObj = {
         id: motherId,
@@ -276,20 +225,6 @@ export function useFamilyForm() {
       familyTreeStore.nodes.push({
         data: { id: motherId, label: motherName.value, gender: "female" },
       });
-      try {
-        const { errors } = await createPerson({
-          personId: motherId,
-          firstName: motherName.value,
-          gender: "female",
-        });
-        if (errors && errors.length > 0) {
-          console.error("Error creating mother in backend:", errors);
-        } else {
-          console.log("Mother created in backend");
-        }
-      } catch (error) {
-        console.error("Error during createPerson for mother:", error);
-      }
     }
 
     // Create the family record.
@@ -346,21 +281,6 @@ export function useFamilyForm() {
       familyNode.data.label =
         (fatherName.value ? fatherName.value : "") +
         (motherName.value ? `\n${motherName.value}` : "");
-    }
-
-    try {
-      const { errors, data } = await createFamily({
-        familyId: newFamily.id,
-        familySignature: familyNode.data.label,
-        members: JSON.stringify(newFamily.members),
-      });
-      if (errors && errors.length > 0) {
-        console.error("Error creating family in backend:", errors);
-      } else {
-        console.log("Family created in backend:", data);
-      }
-    } catch (error) {
-      console.error("Error during createFamily for ancestral family:", error);
     }
   }
 

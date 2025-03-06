@@ -8,27 +8,30 @@ import { importPersons } from "./actions/importPersons.js";
 import { addFamilyMembers } from "./actions/addFamilyMembers.js";
 import debug from "debug";
 import { customAlphabet } from "nanoid";
+import { debounce } from "lodash-es";
+import md5 from "md5";
+
+// Import the per‑record batch upsert and hash loader functions from dataService.
+import {
+  loadHashesFromS3,
+  batchUpsertPersons,
+  batchUpsertFamilies,
+} from "@/services/dataService.js";
 
 const logLoad = debug("familyTree:load");
 const logTransform = debug("familyTree:transform");
 const logSave = debug("familyTree:save");
 
-// Create an 16-character ID generator using lowercase alphanumerics.
+// Create a 16‑character ID generator using lowercase alphanumerics.
 const nanoid = customAlphabet("abcdefghijklmnopqrstuvwxyz0123456789", 16);
 
 /**
  * Compute max generation with a BFS approach.
- * 1) Identify ancestors (never appear as a "child" in any family).
- * 2) Build adjacency from person -> children.
- * 3) BFS from each ancestor, assigning child.generation = parent.generation + 1.
- * 4) Track the maximum generation found.
- *
  * @param {Array} persons - each person has { id, name, gender }
  * @param {Array} families - each family has { id, members: [ { personId, relationship } ] }
  * @returns {Number} the maximum generation found
  */
 function computeMaxGenerationBFS(persons, families) {
-  // 1) Identify childSet so we can find ancestors.
   const childSet = new Set();
   families.forEach((fam) => {
     fam.members
@@ -36,11 +39,9 @@ function computeMaxGenerationBFS(persons, families) {
       .forEach((m) => childSet.add(m.personId));
   });
 
-  // 2) Build adjacency: person -> array of child personIds
-  //    If person is a "parent" in a family, then each "child" in that family is appended to adjacency[personId].
-  const adjacency = {}; // e.g. adjacency["person-1"] = ["person-3", "person-4"]
+  const adjacency = {};
   persons.forEach((p) => {
-    adjacency[p.id] = []; // initialize empty
+    adjacency[p.id] = [];
   });
   families.forEach((fam) => {
     const parentIds = fam.members
@@ -49,24 +50,18 @@ function computeMaxGenerationBFS(persons, families) {
     const childIds = fam.members
       .filter((m) => m.relationship === "child")
       .map((m) => m.personId);
-
-    // For each parent, push all childIds into adjacency
     parentIds.forEach((parentId) => {
       adjacency[parentId].push(...childIds);
     });
   });
 
-  // 3) BFS from each ancestor (person not in childSet) to assign generation
   let maxGeneration = 1;
-  const generationMap = {}; // optional, if you want to store each person's generation
-
+  const generationMap = {};
   const ancestors = persons.filter((p) => !childSet.has(p.id));
   for (const ancestor of ancestors) {
-    // BFS queue: store objects { personId, generation }
     const queue = [{ personId: ancestor.id, generation: 1 }];
     while (queue.length) {
       const { personId, generation } = queue.shift();
-      // If we already have a generation assigned that's >= current, skip
       if (generationMap[personId] && generationMap[personId] >= generation) {
         continue;
       }
@@ -74,13 +69,11 @@ function computeMaxGenerationBFS(persons, families) {
       if (generation > maxGeneration) {
         maxGeneration = generation;
       }
-      // Enqueue children with generation+1
       adjacency[personId].forEach((childId) => {
         queue.push({ personId: childId, generation: generation + 1 });
       });
     }
   }
-
   return maxGeneration;
 }
 
@@ -91,6 +84,8 @@ export const useFamilyTreeStore = defineStore("familyTree", {
     nodes: [],
     edges: [],
     rootPerson: null,
+    // Overall hash of the families and persons (used to trigger S3 writes)
+    lastSavedHash: null,
   }),
   actions: {
     initializeRootPerson,
@@ -132,6 +127,13 @@ export const useFamilyTreeStore = defineStore("familyTree", {
         const amplifyData = JSON.parse(text);
         logLoad("Parsed Amplify data:", amplifyData);
         this.transformAmplifyDataToStore(amplifyData);
+        // Load per‑record hashes from the S3 data (if present).
+        loadHashesFromS3(amplifyData);
+        // Compute and store the overall hash of the store.
+        this.lastSavedHash = hashString(
+          JSON.stringify({ families: this.families, persons: this.persons })
+        );
+        logLoad("Initial overall store hash computed:", this.lastSavedHash);
         logLoad("Amplify data loaded and transformed successfully.");
       } catch (error) {
         logLoad("Error loading Amplify data from S3:", error);
@@ -143,8 +145,9 @@ export const useFamilyTreeStore = defineStore("familyTree", {
 
       // Map Persons
       const persons = amplifyData.Persons.map((p) => ({
-        id: p.personId,
-        name: p.firstName,
+        id: p.personId || p.id,
+        personId: p.personId || p.id,
+        name: p.name,
         gender: p.gender,
       }));
       logTransform("Mapped persons:", persons);
@@ -155,9 +158,10 @@ export const useFamilyTreeStore = defineStore("familyTree", {
 
       // Map Families: parse the stored members JSON string back into an array.
       const families = amplifyData.Families.map((f) => ({
-        id: f.familyId,
+        id: f.familyId || f.id,
+        familyId: f.familyId || f.id,
         familySignature: f.familySignature || "",
-        members: f.members ? JSON.parse(f.members) : [], // Convert back to array
+        members: f.members ? JSON.parse(f.members) : [],
       }));
       logTransform("Mapped families:", families);
 
@@ -215,6 +219,7 @@ export const useFamilyTreeStore = defineStore("familyTree", {
       }
       logTransform("Store state updated.");
     },
+
     async saveTreeToS3() {
       try {
         logSave("Starting save process.");
@@ -227,8 +232,9 @@ export const useFamilyTreeStore = defineStore("familyTree", {
 
         // Transform Persons
         const persons = this.persons.map((person) => ({
+          id: person.id,
           personId: person.id,
-          firstName: person.name,
+          name: person.name,
           gender: person.gender,
         }));
 
@@ -238,7 +244,6 @@ export const useFamilyTreeStore = defineStore("familyTree", {
           if (family.members && family.members.length > 0) {
             members = family.members;
           } else {
-            // Optionally rebuild from edges if needed
             this.edges.forEach((edge) => {
               if (
                 edge.data.target === family.id &&
@@ -259,15 +264,15 @@ export const useFamilyTreeStore = defineStore("familyTree", {
                 });
               }
             });
-            // Remove duplicates if needed.
             members = Array.from(
               new Map(members.map((m) => [m.personId, m])).values()
             );
           }
           return {
+            id: family.id,
             familyId: family.id,
             familySignature: family.familySignature || "",
-            members: JSON.stringify(members), // Convert members array to a JSON string
+            members: JSON.stringify(members),
           };
         });
 
@@ -289,10 +294,25 @@ export const useFamilyTreeStore = defineStore("familyTree", {
         logSave("Error saving family tree to S3:", error);
       }
     },
+
+    // New action: Update backend data using batch upsert.
+    async updateBackendData() {
+      try {
+        console.log("Batch updating backend data...");
+        // Use the batch upsert functions imported from dataService.
+        console.log(this.persons, this.families);
+        await batchUpsertPersons(this.persons);
+        await batchUpsertFamilies(this.families);
+      } catch (error) {
+        console.error("Error updating backend data:", error);
+      }
+    },
+
     // New action: Calculate generation mapping.
     calculateGenerationMapping() {
-      return computeMaxGenerationBFS(this.persons, this.families, this.edges);
+      return computeMaxGenerationBFS(this.persons, this.families);
     },
+
     // New methods for generating IDs.
     getNewFamilyId() {
       return nanoid();
@@ -300,5 +320,34 @@ export const useFamilyTreeStore = defineStore("familyTree", {
     getNewPersonId() {
       return nanoid();
     },
+
+    // New action: Initialize auto-save subscription with debounce and overall hash checking.
+    initAutoSave() {
+      // Helper: compute an overall hash for families and persons.
+      const computeStoreHash = () =>
+        hashString(
+          JSON.stringify({ families: this.families, persons: this.persons })
+        );
+
+      const debouncedSave = debounce(() => {
+        const newHash = computeStoreHash();
+        if (this.lastSavedHash !== newHash) {
+          // Call the backend batch upsert and then save the full tree to S3.
+          this.updateBackendData();
+          this.saveTreeToS3();
+          this.lastSavedHash = newHash;
+        }
+      }, 1000); // Adjust delay (ms) as needed
+
+      // Subscribe to mutations in the store.
+      this.$subscribe((mutation, state) => {
+        debouncedSave();
+      });
+    },
   },
 });
+
+function hashString(str) {
+  let md5hash = md5(str);
+  return md5hash;
+}

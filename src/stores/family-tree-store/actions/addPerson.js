@@ -64,7 +64,7 @@ export async function addPerson(person, enableLogging = false) {
   try {
     const { errors, data } = await createPerson({
       personId: newPerson.id,
-      firstName: newPerson.name,
+      name: newPerson.name,
       gender: newPerson.gender,
     });
     if (errors && errors.length > 0) {

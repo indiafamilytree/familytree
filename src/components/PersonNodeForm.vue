@@ -196,18 +196,18 @@ function cancelExistingFamily() {
   selectedFamilyOption.value = "";
 }
 
-function confirmImmediateFamily() {
+async function confirmImmediateFamily() {
   console.log("Confirming immediate family for", props.personData);
-  createImmediateFamily(props.personData);
+  await createImmediateFamily(props.personData);
   emit("update:personData", { ...props.personData });
   emit("close");
   showImmediateFamilyForm.value = false;
   resetForm();
 }
 
-function confirmAncestralFamily() {
+async function confirmAncestralFamily() {
   console.log("Confirming ancestral family for", props.personData);
-  createAncestralFamily(props.personData);
+  await createAncestralFamily(props.personData);
   emit("update:personData", { ...props.personData });
   emit("close");
   showAncestralFamilyForm.value = false;
