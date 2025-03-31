@@ -18,6 +18,8 @@ import {
   batchUpsertFamilies,
 } from "@/services/dataService.js";
 
+import { createPerson } from "@/services/apiService.js";
+
 const logLoad = debug("familyTree:load");
 const logTransform = debug("familyTree:transform");
 const logSave = debug("familyTree:save");
@@ -142,6 +144,8 @@ export const useFamilyTreeStore = defineStore("familyTree", {
 
     transformAmplifyDataToStore(amplifyData) {
       logTransform("Starting transformation of new model format.");
+
+      console.log(amplifyData);
 
       // Map Persons
       const persons = amplifyData.Persons.map((p) => ({

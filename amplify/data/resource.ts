@@ -1,4 +1,5 @@
 import { type ClientSchema, a, defineData } from "@aws-amplify/backend";
+import { neo4j } from "../functions/neo4j/resource";
 
 /*== STEP 1 ===============================================================
 The section below creates a Todo database table with a "content" field. Try
@@ -11,6 +12,17 @@ and "delete" any "Todo" records.
 // Model to create families to hold the relationships
 
 const schema = a.schema({
+  neo4jOperation: a
+    .query()
+    // Define two arguments: one for the operation name and one for its input (as a JSON string)
+    .arguments({
+      fieldName: a.string(),
+      input: a.string(), // Pass parameters as a JSON string
+    })
+    // Declare that the function returns a string (or you could define a custom type)
+    .returns(a.string())
+    .handler(a.handler.function(neo4j))
+    .authorization((allow) => [allow.authenticated()]),
   Persons: a
     .model({
       personId: a.string(),

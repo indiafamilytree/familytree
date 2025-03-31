@@ -1,8 +1,8 @@
 // ./main.js
 import { debug } from "debug";
 // Set the debug level using localStorage
-//localStorage.setItem("debug", "familyTree:save");
-//debug.enable("familyTree:save");
+localStorage.setItem("debug", "familyTree:load");
+debug.enable("familyTree:load");
 
 import { createApp } from "vue";
 import App from "./App.vue";
